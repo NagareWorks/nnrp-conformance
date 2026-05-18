@@ -1,0 +1,242 @@
+name: Run NNRP Conformance
+description: Run a protocol baseline summary and optional vector comparison against an SDK exporter.
+
+inputs:
+  protocol-version:
+    description: Protocol baseline directory under protocol/.
+    required: true
+  capabilities-path:
+    description: Relative or absolute path to the SDK capability manifest. Defaults to the baseline example-capabilities.json when present.
+    required: false
+    default: ""
+  working-directory:
+    description: Repository directory where the optional SDK vector command should run.
+    required: false
+    default: "."
+  sdk-vector-command:
+    description: Optional PowerShell command that writes an SDK-produced vector manifest to NNRP_CONFORMANCE_SDK_VECTOR_OUTPUT.
+    required: false
+    default: ""
+  artifact-name:
+    description: Optional artifact name override.
+    required: false
+    default: ""
+  upload-artifact:
+    description: Whether to upload the conformance report and generated manifests as an artifact.
+    required: false
+    default: "true"
+
+outputs:
+  report-path:
+    description: Absolute path to the generated conformance report JSON.
+    value: ${{ steps.resolve.outputs.report-path }}
+  canonical-vector-manifest:
+    description: Absolute path to the canonical vector manifest used for comparison, when available.
+    value: ${{ steps.canonical.outputs.canonical-path }}
+  sdk-vector-manifest:
+    description: Absolute path to the SDK-produced vector manifest, when generated.
+    value: ${{ steps.resolve.outputs.sdk-vector-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Resolve suite layout
+      id: resolve
+      shell: pwsh
+      run: |
+        $actionRoot = '${{ github.action_path }}'
+        $suiteRoot = (Resolve-Path (Join-Path $actionRoot '../../..')).Path
+        $protocolRoot = Join-Path $suiteRoot 'protocol' '${{ inputs.protocol-version }}'
+        $protocolManifest = Join-Path $protocolRoot 'manifest.json'
+        if (-not (Test-Path $protocolManifest)) {
+          throw "Protocol manifest not found: $protocolManifest"
+        }
+
+        $workingDirectory = '${{ inputs.working-directory }}'
+        if ([string]::IsNullOrWhiteSpace($workingDirectory)) {
+          $workingDirectory = '.'
+        }
+        if ([System.IO.Path]::IsPathRooted($workingDirectory)) {
+          $workingDirectory = (Resolve-Path $workingDirectory).Path
+        }
+        else {
+          $workingDirectory = (Resolve-Path (Join-Path $env:GITHUB_WORKSPACE $workingDirectory)).Path
+        }
+
+        $capabilitiesPath = '${{ inputs.capabilities-path }}'
+        if ([string]::IsNullOrWhiteSpace($capabilitiesPath)) {
+          $defaultCapabilities = Join-Path $protocolRoot 'example-capabilities.json'
+          if (Test-Path $defaultCapabilities) {
+            $capabilitiesPath = $defaultCapabilities
+          }
+        }
+        elseif ([System.IO.Path]::IsPathRooted($capabilitiesPath)) {
+          $capabilitiesPath = (Resolve-Path $capabilitiesPath).Path
+        }
+        else {
+          $capabilitiesPath = (Resolve-Path (Join-Path $workingDirectory $capabilitiesPath)).Path
+        }
+
+        $artifactName = '${{ inputs.artifact-name }}'
+        if ([string]::IsNullOrWhiteSpace($artifactName)) {
+          $artifactName = 'conformance-${{ inputs.protocol-version }}'
+        }
+
+        $artifactSafeName = $artifactName -replace '[^A-Za-z0-9._-]', '-'
+        $artifactDir = Join-Path $env:RUNNER_TEMP ('nnrp-conformance-' + $artifactSafeName)
+        if (Test-Path $artifactDir) {
+          Remove-Item -Path $artifactDir -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $artifactDir | Out-Null
+
+        $reportPath = Join-Path $artifactDir 'conformance-report.json'
+        $sdkVectorPath = Join-Path $artifactDir 'sdk-vector-manifest.json'
+
+        "suite-root=$suiteRoot" >> $env:GITHUB_OUTPUT
+        "protocol-root=$protocolRoot" >> $env:GITHUB_OUTPUT
+        "protocol-manifest=$protocolManifest" >> $env:GITHUB_OUTPUT
+        "working-directory=$workingDirectory" >> $env:GITHUB_OUTPUT
+        "capabilities-path=$capabilitiesPath" >> $env:GITHUB_OUTPUT
+        "artifact-dir=$artifactDir" >> $env:GITHUB_OUTPUT
+        "artifact-name=$artifactName" >> $env:GITHUB_OUTPUT
+        "report-path=$reportPath" >> $env:GITHUB_OUTPUT
+        "sdk-vector-path=$sdkVectorPath" >> $env:GITHUB_OUTPUT
+
+    - name: Summarize baseline
+      shell: pwsh
+      run: |
+        $runnerManifest = Join-Path '${{ steps.resolve.outputs.suite-root }}' 'Cargo.toml'
+        $arguments = @(
+          'run',
+          '--manifest-path', $runnerManifest,
+          '-p', 'nnrp-conformance-runner',
+          '--',
+          'summary',
+          '--protocol', '${{ steps.resolve.outputs.protocol-manifest }}'
+        )
+        if (-not [string]::IsNullOrWhiteSpace('${{ steps.resolve.outputs.capabilities-path }}')) {
+          $arguments += @('--capabilities', '${{ steps.resolve.outputs.capabilities-path }}')
+        }
+
+        & cargo @arguments | Tee-Object -FilePath '${{ steps.resolve.outputs.report-path }}'
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
+    - name: Generate and verify recipe-backed vectors
+      if: always()
+      shell: pwsh
+      run: |
+        $manifest = Get-Content -Raw '${{ steps.resolve.outputs.protocol-manifest }}' | ConvertFrom-Json
+        $recipeManifests = @($manifest.vector_recipe_manifests | Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace([string]$_) })
+        if ($recipeManifests.Count -eq 0) {
+          exit 0
+        }
+
+        $runnerManifest = Join-Path '${{ steps.resolve.outputs.suite-root }}' 'Cargo.toml'
+        foreach ($recipeRelativePath in $recipeManifests) {
+          $recipePath = Join-Path '${{ steps.resolve.outputs.protocol-root }}' $recipeRelativePath
+          $outputPath = Join-Path '${{ steps.resolve.outputs.artifact-dir }}' (([System.IO.Path]::GetFileNameWithoutExtension([string]$recipeRelativePath)) + '.generated.json')
+
+          & cargo run --manifest-path $runnerManifest -p nnrp-conformance-runner -- generate-vectors --recipe $recipePath --output $outputPath
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          & cargo run --manifest-path $runnerManifest -p nnrp-conformance-runner -- verify-vectors --recipe $recipePath --manifest $outputPath
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+        }
+
+    - name: Select canonical vector manifest
+      id: canonical
+      shell: pwsh
+      env:
+        SDK_VECTOR_COMMAND: ${{ inputs.sdk-vector-command }}
+      run: |
+        $manifest = Get-Content -Raw '${{ steps.resolve.outputs.protocol-manifest }}' | ConvertFrom-Json
+        $recipeManifests = @($manifest.vector_recipe_manifests | Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace([string]$_) })
+        $vectorManifests = @($manifest.vector_manifests | Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace([string]$_) })
+        $hasSdkVectorCommand = -not [string]::IsNullOrWhiteSpace($env:SDK_VECTOR_COMMAND)
+        $canonicalPath = ''
+
+        if ($recipeManifests.Count -gt 0) {
+          if ($hasSdkVectorCommand -and $recipeManifests.Count -ne 1) {
+            throw 'SDK vector comparison requires exactly one vector recipe manifest in the protocol baseline.'
+          }
+          $canonicalPath = Join-Path '${{ steps.resolve.outputs.artifact-dir }}' (([System.IO.Path]::GetFileNameWithoutExtension([string]$recipeManifests[0])) + '.generated.json')
+        }
+        elseif ($vectorManifests.Count -gt 0) {
+          if ($hasSdkVectorCommand -and $vectorManifests.Count -ne 1) {
+            throw 'SDK vector comparison requires exactly one vector manifest in the protocol baseline.'
+          }
+          $canonicalPath = Join-Path '${{ steps.resolve.outputs.protocol-root }}' ([string]$vectorManifests[0])
+        }
+
+        "canonical-path=$canonicalPath" >> $env:GITHUB_OUTPUT
+
+    - name: Export SDK vector manifest
+      if: ${{ inputs.sdk-vector-command != '' }}
+      shell: pwsh
+      env:
+        NNRP_CONFORMANCE_SDK_VECTOR_OUTPUT: ${{ steps.resolve.outputs.sdk-vector-path }}
+        SDK_VECTOR_COMMAND: ${{ inputs.sdk-vector-command }}
+      run: |
+        $command = $env:SDK_VECTOR_COMMAND
+        Push-Location '${{ steps.resolve.outputs.working-directory }}'
+        try {
+          & ([scriptblock]::Create($command))
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+        }
+        finally {
+          Pop-Location
+        }
+
+    - name: Compare SDK vectors against canonical manifest
+      if: ${{ inputs.sdk-vector-command != '' }}
+      shell: pwsh
+      run: |
+        if ([string]::IsNullOrWhiteSpace('${{ steps.canonical.outputs.canonical-path }}')) {
+          throw 'The selected protocol baseline does not expose a single canonical vector manifest for SDK comparison.'
+        }
+
+        $runnerManifest = Join-Path '${{ steps.resolve.outputs.suite-root }}' 'Cargo.toml'
+        & cargo run --manifest-path $runnerManifest -p nnrp-conformance-runner -- compare-vector-manifests --expected '${{ steps.canonical.outputs.canonical-path }}' --actual '${{ steps.resolve.outputs.sdk-vector-path }}'
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
+    - name: Publish conformance summary
+      shell: pwsh
+      run: |
+        $report = Get-Content -Raw '${{ steps.resolve.outputs.report-path }}' | ConvertFrom-Json
+        $lines = @(
+          "## Conformance Summary",
+          "",
+          "- Protocol baseline: $($report.protocol_version)",
+          "- Implementation: $($report.implementation_name)",
+          "- Selected cases: $($report.summary.selected_cases)",
+          "- Not claimed cases: $($report.summary.not_claimed_cases)",
+          "- Informational cases: $($report.summary.informational_cases)"
+        )
+        if (-not [string]::IsNullOrWhiteSpace('${{ steps.canonical.outputs.canonical-path }}')) {
+          $lines += "- Canonical vector manifest: ${{ steps.canonical.outputs.canonical-path }}"
+        }
+        if (Test-Path '${{ steps.resolve.outputs.sdk-vector-path }}') {
+          $lines += "- SDK vector manifest: ${{ steps.resolve.outputs.sdk-vector-path }}"
+        }
+        Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ($lines -join [Environment]::NewLine)
+
+    - name: Upload conformance artifacts
+      if: ${{ inputs.upload-artifact == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.resolve.outputs.artifact-name }}
+        path: ${{ steps.resolve.outputs.artifact-dir }}
+        if-no-files-found: error

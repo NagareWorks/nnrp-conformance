@@ -1,0 +1,118 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview2",
+  "manifest_name": "l0-wire-vectors",
+  "cases": [
+    {
+      "id": "l0.header.fixed_shape.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "header.fixed_shape",
+      "required_capabilities": [],
+      "description": "Parse and re-emit the fixed 40-byte Preview2 common header without changing any frozen fields."
+    },
+    {
+      "id": "l0.control.client_hello.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "control.client_hello",
+      "required_capabilities": [
+        "control.client_hello"
+      ],
+      "description": "Pack and parse the Preview2 CLIENT_HELLO fixed metadata golden vector."
+    },
+    {
+      "id": "l0.control.session_patch_ack.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "control.session_patch_ack",
+      "required_capabilities": [
+        "control.session_patch_ack"
+      ],
+      "description": "Pack and parse the Preview2 SESSION_PATCH_ACK fixed metadata golden vector."
+    },
+    {
+      "id": "l0.flow_update.packet.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Round-trip the canonical Preview2 FLOW_UPDATE packet golden vector."
+    },
+    {
+      "id": "l0.result_hint.packet.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "result_hint",
+      "required_capabilities": [
+        "result_hint"
+      ],
+      "description": "Round-trip the canonical Preview2 RESULT_HINT packet golden vector."
+    },
+    {
+      "id": "l0.frame_submit.metadata.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "frame_submit.mixed",
+      "required_capabilities": [
+        "frame_submit.mixed",
+        "payload.tensor"
+      ],
+      "description": "Encode and decode the Preview2 FRAME_SUBMIT metadata golden vector for mixed submit mode."
+    },
+    {
+      "id": "l0.result_push.metadata.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "result_push.partial_stale",
+      "required_capabilities": [
+        "result_push.partial",
+        "result_push.stale_reuse",
+        "payload.tensor"
+      ],
+      "description": "Encode and decode the Preview2 RESULT_PUSH metadata golden vector for partial stale-reuse results."
+    },
+    {
+      "id": "l0.body_region.prelude.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "body_region.prelude",
+      "required_capabilities": [
+        "body_region.prelude"
+      ],
+      "description": "Preserve the canonical Preview2 body-region prelude layout for inline, reference, and typed payload regions."
+    },
+    {
+      "id": "l0.object_reference.block.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "object_reference.cache",
+      "required_capabilities": [
+        "object_reference.cache"
+      ],
+      "description": "Pack and parse the Preview2 object-reference block used for cache-backed body regions."
+    },
+    {
+      "id": "l0.typed_payload.descriptor.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "payload.typed",
+      "required_capabilities": [
+        "payload.typed"
+      ],
+      "description": "Pack and parse the Preview2 typed-payload descriptor golden vector."
+    },
+    {
+      "id": "l0.typed_payload.frame_regions.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "payload.typed",
+      "required_capabilities": [
+        "payload.typed"
+      ],
+      "description": "Encode the canonical token/audio/video/event typed-payload descriptor and payload regions."
+    }
+  ]
+}

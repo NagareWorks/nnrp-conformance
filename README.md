@@ -8,10 +8,11 @@ This repository keeps the protocol-facing conformance contract separate from any
 
 This repository owns:
 
-1. Versioned protocol baselines such as `protocol/nnrp-1-preview3`.
+1. Versioned protocol baselines such as `protocol/nnrp-1-preview2` and `protocol/nnrp-1-preview3`.
 2. Public machine-readable manifests for cases, capabilities, and reports.
-3. A Rust reference runner that loads the versioned baseline and produces execution-plan/report outputs.
-4. CI checks that keep the repository itself buildable and the published baseline internally consistent.
+3. A Rust reference runner that loads a selected baseline, summarizes capability coverage, generates canonical vector manifests, verifies recipe determinism, and compares SDK-exported manifests against canonical output.
+4. A suite-owned GitHub composite action that executes the canonical conformance flow for SDK repositories.
+5. CI checks that keep the repository itself buildable and the published baselines internally consistent.
 
 This repository does not own host-language API ergonomics, runtime-private test harnesses, or repository-local regressions for one SDK.
 
@@ -23,16 +24,14 @@ This repository does not own host-language API ergonomics, runtime-private test 
 4. `schemas/`: JSON schema files for public manifests and reports.
 5. `docs/todo/`: repository-local execution backlog, split by protocol line and workstream.
 
-## Current Bootstrap Boundary
+## Current Suite Boundary
 
-The initial repository bootstrap establishes the minimum Preview3 baseline contract:
+The current repository state establishes the shared conformance entrypoint described by the protocol design docs:
 
-1. A versioned Preview3 protocol manifest.
-2. A first mandatory case manifest for the minimum frozen core.
-3. A capability-manifest contract so implementations only run cases for declared capabilities.
-4. A report contract so CI can prove which protocol line was selected.
-
-The initial runner intentionally stops at plan construction and version-alignment checks. It does not yet execute transport flows or byte-vector assertions.
+1. Multiple versioned protocol baselines can coexist under `protocol/`.
+2. Capability manifests decide which `mandatory` and `optional` cases are actually selected for a given implementation.
+3. Recipe-backed canonical vector manifests can be generated and deterministically verified inside the suite.
+4. SDK repositories integrate through the suite-owned `run-conformance` action plus an SDK exporter command, not by embedding suite conformance into local pytest/xUnit coverage jobs.
 
 ## Local Commands
 
@@ -44,19 +43,43 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-Print a Preview3 execution-plan summary against the sample capability manifest:
+Print an execution-plan summary against a versioned sample capability manifest:
 
 ```bash
 cargo run -p nnrp-conformance-runner -- \
   summary \
-  --protocol protocol/nnrp-1-preview3/manifest.json \
-  --cases protocol/nnrp-1-preview3/cases/mandatory-core.json \
-  --capabilities protocol/nnrp-1-preview3/example-capabilities.json
+  --protocol protocol/nnrp-1-preview2/manifest.json \
+  --capabilities protocol/nnrp-1-preview2/example-capabilities.json
+```
+
+The `summary` command emits the public conformance report shape defined by `schemas/report.schema.json`. It is not a capability manifest and should never be stored or labeled as one.
+
+Generate and verify the canonical vector manifest from a recipe-backed baseline:
+
+```bash
+cargo run -p nnrp-conformance-runner -- \
+  generate-vectors \
+  --recipe protocol/nnrp-1-preview2/vectors/semantic-vectors.json \
+  --output artifacts/local-preview2-vectors.json
+
+cargo run -p nnrp-conformance-runner -- \
+  verify-vectors \
+  --recipe protocol/nnrp-1-preview2/vectors/semantic-vectors.json \
+  --manifest artifacts/local-preview2-vectors.json
+```
+
+Compare an SDK-exported manifest against the canonical manifest:
+
+```bash
+cargo run -p nnrp-conformance-runner -- \
+  compare-vector-manifests \
+  --expected artifacts/local-preview2-vectors.json \
+  --actual /path/to/sdk-vector-manifest.json
 ```
 
 ## CI Contract
 
-CI must never infer the target protocol line from branch naming or implementation code shape. It must always select an explicit baseline, then verify that:
+CI must never infer the target protocol line from branch naming or implementation code shape. It must always select an explicit baseline. In the suite repository, that means dynamically enumerating `protocol/*/manifest.json` and running the same suite-owned action against each baseline. In SDK repositories, that means using the suite-owned `run-conformance` action in a dedicated `conformance` job. The suite then verifies that:
 
 1. The protocol manifest version matches the case manifest version.
 2. The implementation capability manifest declares the same protocol version.

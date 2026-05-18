@@ -1,0 +1,47 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview2",
+  "manifest_name": "l1-control-plane",
+  "cases": [
+    {
+      "id": "l1.flow_update.metadata.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Validate Preview2 FLOW_UPDATE metadata semantics, including scope, flags, retry-after, and framed-message round-trip behavior."
+    },
+    {
+      "id": "l1.result_hint.metadata.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "result_hint",
+      "required_capabilities": [
+        "result_hint"
+      ],
+      "description": "Validate Preview2 RESULT_HINT metadata semantics and reject malformed reason codes or invalid fixed-width payloads."
+    },
+    {
+      "id": "l1.cache.lifecycle.roundtrip",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Round-trip CACHE_PUT, CACHE_ACK, and CACHE_INVALIDATE semantics for reusable Preview2 low-frequency objects."
+    },
+    {
+      "id": "l1.transport_probe.metadata.roundtrip",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "transport.probe",
+      "required_capabilities": [
+        "transport.probe"
+      ],
+      "description": "Validate Preview2 transport-probe control metadata before transport auto-selection enters smoke-level interop coverage."
+    }
+  ]
+}

@@ -8,7 +8,42 @@ on:
   workflow_dispatch:
 
 jobs:
-  verify:
+  discover-baselines:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enumerate protocol baselines
+        id: baselines
+        shell: pwsh
+        run: |
+          $baselineDirectories = Get-ChildItem -Path protocol -Directory |
+            Sort-Object Name |
+            Where-Object { Test-Path (Join-Path $_.FullName 'manifest.json') }
+
+          $baselineIndex = 1
+          $baselines = $baselineDirectories | ForEach-Object {
+              $manifest = Get-Content -Raw (Join-Path $_.FullName 'manifest.json') | ConvertFrom-Json
+              $baselineId = 'baseline-{0:D2}' -f $baselineIndex
+              $baselineIndex += 1
+              [pscustomobject]@{
+                baseline_id = $baselineId
+                protocol_version = $manifest.protocol_version
+              }
+            }
+
+          if ($baselines.Count -eq 0) {
+            throw 'No protocol baselines were found under protocol/.'
+          }
+
+          "matrix=$($baselines | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+
+    outputs:
+      matrix: ${{ steps.baselines.outputs.matrix }}
+
+  verify-workspace:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,10 +67,23 @@ jobs:
       - name: Test workspace
         run: cargo test --workspace
 
-      - name: Summarize preview3 baseline
-        run: >-
-          cargo run -p nnrp-conformance-runner --
-          summary
-          --protocol protocol/nnrp-1-preview3/manifest.json
-          --cases protocol/nnrp-1-preview3/cases/mandatory-core.json
-          --capabilities protocol/nnrp-1-preview3/example-capabilities.json
+  verify-baselines:
+    name: verify-${{ matrix.baseline_id }}
+    needs:
+      - discover-baselines
+      - verify-workspace
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.discover-baselines.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run baseline conformance
+        uses: ./.github/actions/run-conformance
+        with:
+          protocol-version: ${{ matrix.protocol_version }}
+          artifact-name: conformance-${{ matrix.baseline_id }}

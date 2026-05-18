@@ -1,52 +1,32 @@
 use nnrp_conformance_fixtures::{
-    CapabilityManifest, CaseManifest, CaseStatus, FixtureError, ProtocolManifest,
-    validate_protocol_alignment,
+    CapabilityManifest, CaseDefinition, CaseManifest, CaseStatus, ConformanceReport, FixtureError,
+    ProtocolManifest, ReportCase, ReportSummary, validate_protocol_alignment,
 };
-use serde::Serialize;
 use std::collections::BTreeSet;
+use std::path::Path;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum CaseSelection {
     Selected,
     NotClaimed,
     Informational,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct PlannedCase {
-    pub id: String,
-    pub feature: String,
-    pub status: CaseStatus,
-    pub selection: CaseSelection,
+impl CaseSelection {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Selected => "selected",
+            Self::NotClaimed => "not_claimed",
+            Self::Informational => "informational",
+        }
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ExecutionPlanSummary {
-    pub protocol_version: String,
-    pub implementation_name: String,
-    pub declared_capabilities: Vec<String>,
-    pub selected_cases: usize,
-    pub not_claimed_cases: usize,
-    pub informational_cases: usize,
-    pub cases: Vec<PlannedCase>,
-}
-
-pub fn build_execution_plan(
+fn build_execution_plan_from_cases<'a>(
     protocol_manifest: &ProtocolManifest,
-    case_manifest: &CaseManifest,
+    cases: impl Iterator<Item = &'a CaseDefinition>,
     capability_manifest: Option<&CapabilityManifest>,
-    case_manifest_path: &std::path::Path,
-    capability_manifest_path: Option<&std::path::Path>,
-) -> Result<ExecutionPlanSummary, FixtureError> {
-    validate_protocol_alignment(
-        protocol_manifest,
-        case_manifest,
-        capability_manifest,
-        case_manifest_path,
-        capability_manifest_path,
-    )?;
-
+) -> ConformanceReport {
     let declared_capabilities = capability_manifest
         .map(|manifest| manifest.supports.iter().cloned().collect::<BTreeSet<_>>())
         .unwrap_or_default();
@@ -58,9 +38,7 @@ pub fn build_execution_plan(
     let mut not_claimed_cases = 0;
     let mut informational_cases = 0;
 
-    let cases = case_manifest
-        .cases
-        .iter()
+    let cases = cases
         .map(|case| {
             let capabilities_satisfied = case
                 .required_capabilities
@@ -92,29 +70,79 @@ pub fn build_execution_plan(
                 }
             };
 
-            PlannedCase {
+            ReportCase {
                 id: case.id.clone(),
-                feature: case.feature.clone(),
-                status: case.status,
-                selection,
+                feature: Some(case.feature.clone()),
+                status: Some(case.status),
+                selection: selection.as_str().to_string(),
             }
         })
         .collect();
 
-    Ok(ExecutionPlanSummary {
+    ConformanceReport {
         protocol_version: protocol_manifest.protocol_version.clone(),
         implementation_name,
-        declared_capabilities: declared_capabilities.into_iter().collect(),
-        selected_cases,
-        not_claimed_cases,
-        informational_cases,
+        summary: ReportSummary {
+            selected_cases,
+            not_claimed_cases,
+            informational_cases,
+        },
         cases,
-    })
+    }
+}
+
+pub fn build_execution_plan(
+    protocol_manifest: &ProtocolManifest,
+    case_manifest: &CaseManifest,
+    capability_manifest: Option<&CapabilityManifest>,
+    case_manifest_path: &std::path::Path,
+    capability_manifest_path: Option<&std::path::Path>,
+) -> Result<ConformanceReport, FixtureError> {
+    validate_protocol_alignment(
+        protocol_manifest,
+        case_manifest,
+        capability_manifest,
+        case_manifest_path,
+        capability_manifest_path,
+    )?;
+
+    Ok(build_execution_plan_from_cases(
+        protocol_manifest,
+        case_manifest.cases.iter(),
+        capability_manifest,
+    ))
+}
+
+pub fn build_execution_plan_for_manifests<'a>(
+    protocol_manifest: &ProtocolManifest,
+    case_manifests: impl IntoIterator<Item = (&'a CaseManifest, &'a Path)>,
+    capability_manifest: Option<&CapabilityManifest>,
+    capability_manifest_path: Option<&Path>,
+) -> Result<ConformanceReport, FixtureError> {
+    let case_manifests = case_manifests.into_iter().collect::<Vec<_>>();
+
+    for (case_manifest, case_manifest_path) in &case_manifests {
+        validate_protocol_alignment(
+            protocol_manifest,
+            case_manifest,
+            capability_manifest,
+            case_manifest_path,
+            capability_manifest_path,
+        )?;
+    }
+
+    Ok(build_execution_plan_from_cases(
+        protocol_manifest,
+        case_manifests
+            .into_iter()
+            .flat_map(|(case_manifest, _)| case_manifest.cases.iter()),
+        capability_manifest,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{CaseSelection, build_execution_plan};
+    use super::{build_execution_plan, build_execution_plan_for_manifests};
     use nnrp_conformance_fixtures::{
         CapabilityManifest, CaseDefinition, CaseLayer, CaseManifest, CaseStatus, ProtocolManifest,
     };
@@ -128,6 +156,7 @@ mod tests {
             suite_version: "0.1.0".to_string(),
             status: "draft".to_string(),
             case_manifests: vec![],
+            vector_recipe_manifests: vec![],
             vector_manifests: vec![],
             report_schema: "report.schema.json".to_string(),
         };
@@ -160,9 +189,9 @@ mod tests {
         )
         .expect("execution plan should build");
 
-        assert_eq!(summary.selected_cases, 0);
-        assert_eq!(summary.not_claimed_cases, 1);
-        assert_eq!(summary.cases[0].selection, CaseSelection::NotClaimed);
+        assert_eq!(summary.summary.selected_cases, 0);
+        assert_eq!(summary.summary.not_claimed_cases, 1);
+        assert_eq!(summary.cases[0].selection, "not_claimed");
     }
 
     #[test]
@@ -173,6 +202,7 @@ mod tests {
             suite_version: "0.1.0".to_string(),
             status: "draft".to_string(),
             case_manifests: vec![],
+            vector_recipe_manifests: vec![],
             vector_manifests: vec![],
             report_schema: "report.schema.json".to_string(),
         };
@@ -199,7 +229,71 @@ mod tests {
         )
         .expect("execution plan should build");
 
-        assert_eq!(summary.informational_cases, 1);
-        assert_eq!(summary.cases[0].selection, CaseSelection::Informational);
+        assert_eq!(summary.summary.informational_cases, 1);
+        assert_eq!(summary.cases[0].selection, "informational");
+    }
+
+    #[test]
+    fn aggregates_multiple_case_manifests() {
+        let protocol_manifest = ProtocolManifest {
+            schema: None,
+            protocol_version: "nnrp-1-preview2".to_string(),
+            suite_version: "0.1.0".to_string(),
+            status: "draft".to_string(),
+            case_manifests: vec![
+                "cases/l0-wire-vectors.json".to_string(),
+                "cases/l3-transport-smoke.json".to_string(),
+            ],
+            vector_recipe_manifests: vec![],
+            vector_manifests: vec![],
+            report_schema: "../../schemas/report.schema.json".to_string(),
+        };
+        let case_manifest_a = CaseManifest {
+            schema: None,
+            protocol_version: "nnrp-1-preview2".to_string(),
+            manifest_name: "l0-wire-vectors".to_string(),
+            cases: vec![CaseDefinition {
+                id: "l0.header.fixed_shape.golden".to_string(),
+                layer: CaseLayer::L0,
+                status: CaseStatus::Mandatory,
+                feature: "header.fixed_shape".to_string(),
+                required_capabilities: vec![],
+                description: "test".to_string(),
+            }],
+        };
+        let case_manifest_b = CaseManifest {
+            schema: None,
+            protocol_version: "nnrp-1-preview2".to_string(),
+            manifest_name: "l3-transport-smoke".to_string(),
+            cases: vec![CaseDefinition {
+                id: "l3.transport.tcp.session_smoke".to_string(),
+                layer: CaseLayer::L3,
+                status: CaseStatus::Optional,
+                feature: "transport.tcp".to_string(),
+                required_capabilities: vec!["transport.tcp".to_string()],
+                description: "test".to_string(),
+            }],
+        };
+        let capability_manifest = CapabilityManifest {
+            schema: None,
+            implementation_name: "sample".to_string(),
+            protocol_version: "nnrp-1-preview2".to_string(),
+            supports: vec!["transport.tcp".to_string()],
+        };
+
+        let summary = build_execution_plan_for_manifests(
+            &protocol_manifest,
+            [
+                (&case_manifest_a, Path::new("cases/l0-wire-vectors.json")),
+                (&case_manifest_b, Path::new("cases/l3-transport-smoke.json")),
+            ],
+            Some(&capability_manifest),
+            Some(Path::new("nnrp-preview2.capabilities.json")),
+        )
+        .expect("execution plan should build");
+
+        assert_eq!(summary.summary.selected_cases, 2);
+        assert_eq!(summary.summary.not_claimed_cases, 0);
+        assert_eq!(summary.cases.len(), 2);
     }
 }

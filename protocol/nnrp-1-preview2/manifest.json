@@ -1,0 +1,17 @@
+{
+  "$schema": "../../schemas/protocol-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview2",
+  "suite_version": "0.1.0",
+  "status": "draft",
+  "case_manifests": [
+    "cases/l0-wire-vectors.json",
+    "cases/l1-control-plane.json",
+    "cases/l1-data-plane.json",
+    "cases/l3-transport-smoke.json"
+  ],
+  "vector_recipe_manifests": [
+    "vectors/semantic-vectors.json"
+  ],
+  "vector_manifests": [],
+  "report_schema": "../../schemas/report.schema.json"
+}

@@ -38,6 +38,12 @@
         "type": "string"
       }
     },
+    "vector_recipe_manifests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "vector_manifests": {
       "type": "array",
       "items": {

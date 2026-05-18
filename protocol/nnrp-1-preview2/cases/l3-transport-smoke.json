@@ -1,0 +1,37 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview2",
+  "manifest_name": "l3-transport-smoke",
+  "cases": [
+    {
+      "id": "l3.transport.probe.selection",
+      "layer": "L3",
+      "status": "optional",
+      "feature": "transport.probe",
+      "required_capabilities": [
+        "transport.probe"
+      ],
+      "description": "Run the Preview2 transport-probe selection logic and preserve the success/throughput/RTT ranking contract."
+    },
+    {
+      "id": "l3.transport.tcp.session_smoke",
+      "layer": "L3",
+      "status": "optional",
+      "feature": "transport.tcp",
+      "required_capabilities": [
+        "transport.tcp"
+      ],
+      "description": "Bring up a minimum Preview2 TCP session and complete the control and submit/result smoke path."
+    },
+    {
+      "id": "l3.transport.quic.session_smoke",
+      "layer": "L3",
+      "status": "optional",
+      "feature": "transport.quic",
+      "required_capabilities": [
+        "transport.quic"
+      ],
+      "description": "Bring up a minimum Preview2 QUIC session and complete the control and submit/result smoke path."
+    }
+  ]
+}

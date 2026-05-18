@@ -1,0 +1,61 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview2",
+  "manifest_name": "l1-data-plane",
+  "cases": [
+    {
+      "id": "l1.frame_submit.message.parse_emit",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "frame_submit.mixed",
+      "required_capabilities": [
+        "frame_submit.mixed",
+        "payload.tensor"
+      ],
+      "description": "Parse and re-emit Preview2 FRAME_SUBMIT messages with stable section ordering, tile indices, and mixed submit-mode metadata."
+    },
+    {
+      "id": "l1.result_push.message.parse_emit",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "result_push.partial_stale",
+      "required_capabilities": [
+        "result_push.partial",
+        "result_push.stale_reuse",
+        "payload.tensor"
+      ],
+      "description": "Parse and re-emit Preview2 RESULT_PUSH messages for partial and stale-reuse semantics without corrupting tile-index or section-body layout."
+    },
+    {
+      "id": "l1.result_push.object_reference.resolve",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "object_reference.cache",
+      "required_capabilities": [
+        "object_reference.cache",
+        "result_push.partial"
+      ],
+      "description": "Accept Preview2 object-reference regions inside composite result bodies and reject unresolved cache-backed references."
+    },
+    {
+      "id": "l1.typed_payload.region.pack",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "payload.typed",
+      "required_capabilities": [
+        "payload.typed"
+      ],
+      "description": "Encode and preserve Preview2 typed-payload descriptor regions and payload frames for non-tensor hot-path payloads."
+    },
+    {
+      "id": "l1.result_push.degraded_semantics",
+      "layer": "L1",
+      "status": "experimental",
+      "feature": "result_push.degraded",
+      "required_capabilities": [
+        "result_push.degraded"
+      ],
+      "description": "Track Preview2 degraded-result semantics while host SDKs continue converging on a frozen public surface."
+    }
+  ]
+}

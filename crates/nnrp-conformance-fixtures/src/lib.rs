@@ -4,6 +4,13 @@ use std::fs;
 use std::path::Path;
 use thiserror::Error;
 
+mod preview2_vectors;
+
+pub use preview2_vectors::{
+    GoldenVector, Preview2SemanticVectorManifest, VectorManifest, build_preview2_vector_manifest,
+    verify_preview2_vector_manifest,
+};
+
 #[derive(Debug, Error)]
 pub enum FixtureError {
     #[error("failed to read json fixture {path}: {source}")]
@@ -24,23 +31,27 @@ pub enum FixtureError {
         actual: String,
         path: String,
     },
+    #[error("fixture validation failed: {message}")]
+    Validation { message: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProtocolManifest {
-    #[serde(default)]
+    #[serde(rename = "$schema", default)]
     pub schema: Option<String>,
     pub protocol_version: String,
     pub suite_version: String,
     pub status: String,
     pub case_manifests: Vec<String>,
+    #[serde(default)]
+    pub vector_recipe_manifests: Vec<String>,
     pub vector_manifests: Vec<String>,
     pub report_schema: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaseManifest {
-    #[serde(default)]
+    #[serde(rename = "$schema", default)]
     pub schema: Option<String>,
     pub protocol_version: String,
     pub manifest_name: String,
@@ -49,7 +60,7 @@ pub struct CaseManifest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilityManifest {
-    #[serde(default)]
+    #[serde(rename = "$schema", default)]
     pub schema: Option<String>,
     pub implementation_name: String,
     pub protocol_version: String,
@@ -74,6 +85,10 @@ pub struct ReportSummary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReportCase {
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub feature: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<CaseStatus>,
     pub selection: String,
 }
 
@@ -159,8 +174,9 @@ pub fn validate_protocol_alignment(
 #[cfg(test)]
 mod tests {
     use super::{
-        CapabilityManifest, CaseManifest, CaseStatus, ProtocolManifest, load_json_file,
-        validate_protocol_alignment,
+        CapabilityManifest, CaseManifest, CaseStatus, Preview2SemanticVectorManifest,
+        ProtocolManifest, build_preview2_vector_manifest, load_json_file,
+        validate_protocol_alignment, verify_preview2_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -194,6 +210,7 @@ mod tests {
             suite_version: "0.1.0".to_string(),
             status: "draft".to_string(),
             case_manifests: vec!["cases/mandatory-core.json".to_string()],
+            vector_recipe_manifests: vec![],
             vector_manifests: vec![],
             report_schema: "../../schemas/report.schema.json".to_string(),
         };
@@ -233,5 +250,60 @@ mod tests {
         .expect("protocol manifest should load");
 
         assert_eq!(manifest.protocol_version, "nnrp-1-preview3");
+    }
+
+    #[test]
+    fn generates_preview2_vectors_from_semantic_fixture() {
+        let semantic_manifest: Preview2SemanticVectorManifest = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("protocol")
+                .join("nnrp-1-preview2")
+                .join("vectors")
+                .join("semantic-vectors.json"),
+        )
+        .expect("semantic vector manifest should load");
+
+        let vector_manifest =
+            build_preview2_vector_manifest(&semantic_manifest, "vectors/semantic-vectors.json")
+                .expect("preview2 vectors should generate");
+
+        assert_eq!(vector_manifest.protocol_version, "nnrp-1-preview2");
+        assert_eq!(
+            vector_manifest.generated_from.as_deref(),
+            Some("vectors/semantic-vectors.json")
+        );
+        assert_eq!(vector_manifest.vectors.len(), 12);
+        assert_eq!(vector_manifest.vectors[1].bytes, 64);
+        assert_eq!(
+            vector_manifest.vectors[0].hex,
+            "4e4e525001001028210000003000000000100000070000000b0000000200000015cd5b0700000000"
+        );
+    }
+
+    #[test]
+    fn generates_preview2_vectors_deterministically() {
+        let semantic_manifest: Preview2SemanticVectorManifest = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("protocol")
+                .join("nnrp-1-preview2")
+                .join("vectors")
+                .join("semantic-vectors.json"),
+        )
+        .expect("semantic vector manifest should load");
+
+        let vector_manifest =
+            build_preview2_vector_manifest(&semantic_manifest, "vectors/semantic-vectors.json")
+                .expect("preview2 vectors should generate");
+
+        verify_preview2_vector_manifest(
+            &semantic_manifest,
+            &vector_manifest,
+            "vectors/semantic-vectors.json",
+        )
+        .expect("generated preview2 vectors should match semantic recipe deterministically");
     }
 }

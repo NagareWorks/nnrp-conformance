@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/preview2-vector-recipes.schema.json",
+  "title": "NNRP Preview2 Semantic Vector Recipes",
+  "type": "object",
+  "required": ["protocol_version", "vectors"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "protocol_version": {"const": "nnrp-1-preview2"},
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["recipe_type", "name", "description"],
+        "properties": {
+          "recipe_type": {"type": "string", "minLength": 1},
+          "name": {"type": "string", "minLength": 1},
+          "description": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}
