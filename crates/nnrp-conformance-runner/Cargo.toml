@@ -1,0 +1,13 @@
+[package]
+name = "nnrp-conformance-runner"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+nnrp-conformance-fixtures = { path = "../nnrp-conformance-fixtures" }
+serde.workspace = true
+serde_json.workspace = true

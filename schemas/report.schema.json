@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/report.schema.json",
+  "title": "NNRP Conformance Report",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "implementation_name",
+    "summary",
+    "cases"
+  ],
+  "properties": {
+    "protocol_version": {
+      "type": "string"
+    },
+    "implementation_name": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "selected_cases",
+        "not_claimed_cases",
+        "informational_cases"
+      ],
+      "properties": {
+        "selected_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_claimed_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "informational_cases": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "selection"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "selection": {
+            "type": "string",
+            "enum": [
+              "selected",
+              "not_claimed",
+              "informational"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

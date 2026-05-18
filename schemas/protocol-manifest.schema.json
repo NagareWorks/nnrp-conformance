@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/protocol-manifest.schema.json",
+  "title": "NNRP Protocol Manifest",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "suite_version",
+    "status",
+    "case_manifests",
+    "vector_manifests",
+    "report_schema"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "suite_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "frozen",
+        "deprecated"
+      ]
+    },
+    "case_manifests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "vector_manifests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "report_schema": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

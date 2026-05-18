@@ -1,0 +1,10 @@
+{
+  "protocol_version": "nnrp-1-preview3",
+  "vectors": [
+    {
+      "id": "preview3.bootstrap.placeholder",
+      "status": "planned",
+      "description": "Preview3 canonical golden vectors land here once the frozen L0 byte shape is final."
+    }
+  ]
+}

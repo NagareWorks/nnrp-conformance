@@ -1,0 +1,13 @@
+{
+  "$schema": "../../schemas/protocol-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "suite_version": "0.1.0",
+  "status": "draft",
+  "case_manifests": [
+    "cases/mandatory-core.json"
+  ],
+  "vector_manifests": [
+    "vectors/golden-vectors.json"
+  ],
+  "report_schema": "../../schemas/report.schema.json"
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "manifest_name": "mandatory-core",
+  "cases": [
+    {
+      "id": "l0.header.roundtrip.basic",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "header.roundtrip.basic",
+      "required_capabilities": [],
+      "description": "Parse and re-emit the common Preview3 header without changing fixed-width fields."
+    },
+    {
+      "id": "l0.header.invalid_length.reject",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "header.invalid_length.reject",
+      "required_capabilities": [],
+      "description": "Reject packets whose declared length is inconsistent with the actual body length."
+    },
+    {
+      "id": "l1.handshake.basic",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "handshake.basic",
+      "required_capabilities": [
+        "handshake.basic"
+      ],
+      "description": "Complete the minimum Preview3 handshake and capability negotiation flow."
+    },
+    {
+      "id": "l1.session.open_close",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Open a session, maintain protocol state, and close it without violating the state machine."
+    },
+    {
+      "id": "l1.frame_submit.tensor.inline",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "frame_submit.tensor.inline",
+      "required_capabilities": [
+        "frame_submit.tensor.inline",
+        "result_push.basic"
+      ],
+      "description": "Accept a minimum inline tensor submit packet and return a compatible result packet."
+    },
+    {
+      "id": "l3.transport.quic.minimum",
+      "layer": "L3",
+      "status": "optional",
+      "feature": "transport.quic",
+      "required_capabilities": [
+        "transport.quic"
+      ],
+      "description": "Run the minimum interoperable QUIC transport bring-up for Preview3."
+    },
+    {
+      "id": "l3.transport.tcp.minimum",
+      "layer": "L3",
+      "status": "optional",
+      "feature": "transport.tcp",
+      "required_capabilities": [
+        "transport.tcp"
+      ],
+      "description": "Run the minimum interoperable TCP transport bring-up for Preview3."
+    },
+    {
+      "id": "l1.flow_update.preview3",
+      "layer": "L1",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Track Preview3 flow-control semantics before they are frozen into the mandatory core."
+    }
+  ]
+}

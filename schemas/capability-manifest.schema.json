@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/capability-manifest.schema.json",
+  "title": "NNRP Capability Manifest",
+  "type": "object",
+  "required": [
+    "implementation_name",
+    "protocol_version",
+    "supports"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "implementation_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supports": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}
