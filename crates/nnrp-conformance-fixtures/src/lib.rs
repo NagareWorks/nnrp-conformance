@@ -68,18 +68,93 @@ pub struct CapabilityManifest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdapterExecutionPlan {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub suite_version: String,
+    pub implementation_name: String,
+    pub artifacts: AdapterArtifactContext,
+    pub cases: Vec<AdapterExecutionCase>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdapterArtifactContext {
+    pub results_path: String,
+    pub evidence_dir: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdapterExecutionCase {
+    pub id: String,
+    pub layer: CaseLayer,
+    pub status: CaseStatus,
+    pub feature: String,
+    pub required_capabilities: Vec<String>,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdapterCaseResultReport {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub implementation_name: String,
+    pub results: Vec<AdapterCaseResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdapterCaseResult {
+    pub id: String,
+    pub outcome: AdapterCaseOutcome,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failure_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_paths: Vec<String>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AdapterCaseOutcome {
+    Pass,
+    Fail,
+    Skip,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConformanceReport {
     pub protocol_version: String,
     pub implementation_name: String,
     pub summary: ReportSummary,
+    pub compatibility_matrix: Vec<CompatibilityMatrixEntry>,
     pub cases: Vec<ReportCase>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ReportSummary {
     pub selected_cases: usize,
     pub not_claimed_cases: usize,
     pub informational_cases: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompatibilityMatrixEntry {
+    pub feature: String,
+    pub required_capabilities: Vec<String>,
+    pub summary: ReportSummary,
+    pub statuses: ReportStatusSummary,
+    pub case_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ReportStatusSummary {
+    pub mandatory_cases: usize,
+    pub optional_cases: usize,
+    pub experimental_cases: usize,
+    pub deprecated_cases: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -174,7 +249,8 @@ pub fn validate_protocol_alignment(
 #[cfg(test)]
 mod tests {
     use super::{
-        CapabilityManifest, CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest,
+        AdapterCaseResultReport, AdapterExecutionPlan, CapabilityManifest, CaseManifest,
+        CaseStatus, ProtocolManifest, SemanticVectorManifest, VectorManifest,
         build_vector_manifest, load_json_file, validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
@@ -249,6 +325,138 @@ mod tests {
         .expect("protocol manifest should load");
 
         assert_eq!(manifest.protocol_version, "nnrp-1-preview3");
+    }
+
+    #[test]
+    fn loads_preview3_case_manifests_from_repo_fixture() {
+        let protocol_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("protocol")
+            .join("nnrp-1-preview3");
+        let protocol_manifest: ProtocolManifest =
+            load_json_file(protocol_root.join("manifest.json"))
+                .expect("protocol manifest should load");
+        let capability_manifest: CapabilityManifest =
+            load_json_file(protocol_root.join("example-capabilities.json"))
+                .expect("example capability manifest should load");
+
+        assert_eq!(protocol_manifest.case_manifests.len(), 8);
+
+        for relative_path in &protocol_manifest.case_manifests {
+            let case_manifest: CaseManifest = load_json_file(protocol_root.join(relative_path))
+                .unwrap_or_else(|error| {
+                    panic!("case manifest {relative_path} should load: {error}")
+                });
+
+            validate_protocol_alignment(
+                &protocol_manifest,
+                &case_manifest,
+                Some(&capability_manifest),
+                PathBuf::from(relative_path),
+                Some(PathBuf::from("example-capabilities.json")),
+            )
+            .unwrap_or_else(|error| panic!("case manifest {relative_path} should align: {error}"));
+        }
+
+        assert!(
+            protocol_manifest
+                .case_manifests
+                .iter()
+                .any(|path| path == "cases/l2-binding-driver.json")
+        );
+    }
+
+    #[test]
+    fn loads_adapter_execution_plan_example() {
+        let plan: AdapterExecutionPlan = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("adapter-execution-plan.sample.json"),
+        )
+        .expect("adapter execution plan example should load");
+
+        assert_eq!(plan.protocol_version, "nnrp-1-preview3");
+        assert_eq!(plan.cases.len(), 2);
+        assert_eq!(
+            plan.artifacts.results_path,
+            "artifacts/adapter-results.json"
+        );
+    }
+
+    #[test]
+    fn loads_adapter_case_results_example() {
+        let report: AdapterCaseResultReport = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("adapter-case-results.sample.json"),
+        )
+        .expect("adapter case results example should load");
+
+        assert_eq!(report.protocol_version, "nnrp-1-preview3");
+        assert_eq!(report.results.len(), 2);
+        assert_eq!(report.results[1].outcome, super::AdapterCaseOutcome::Fail);
+    }
+
+    #[test]
+    fn loads_preview3_vector_manifest_from_repo_fixture() {
+        let vector_manifest: VectorManifest = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("protocol")
+                .join("nnrp-1-preview3")
+                .join("vectors")
+                .join("golden-vectors.json"),
+        )
+        .expect("preview3 vector manifest should load");
+
+        assert_eq!(vector_manifest.protocol_version, "nnrp-1-preview3");
+        assert_eq!(vector_manifest.vectors.len(), 23);
+
+        let resumed = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| vector.name == "preview3.metadata.session_open_ack.resumed")
+            .expect("resumed metadata vector should exist");
+        assert_eq!(resumed.bytes, 56);
+
+        let operation_flow = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| vector.name == "preview3.packet.flow_update.operation_pause")
+            .expect("operation flow-update vector should exist");
+        assert_eq!(operation_flow.kind, "flow_update_packet");
+        assert_eq!(operation_flow.bytes, 72);
+
+        let cache_error = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| vector.name == "preview3.value.cache_error_code.schema_mismatch")
+            .expect("schema_mismatch cache-error vector should exist");
+        assert_eq!(cache_error.bytes, 4);
+
+        let schema_error = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| vector.name == "preview3.value.schema_error_code.schema_update_rejected")
+            .expect("schema_update_rejected schema-error vector should exist");
+        assert_eq!(schema_error.bytes, 4);
+
+        let typed_descriptor = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| {
+                vector.name == "preview3.metadata.typed_payload_descriptor.token_partial"
+            })
+            .expect("typed payload descriptor vector should exist");
+        assert_eq!(typed_descriptor.bytes, 24);
     }
 
     #[test]

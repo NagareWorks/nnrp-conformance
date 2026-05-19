@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/adapter-case-results.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "implementation_name": "sample-adapter",
+  "results": [
+    {
+      "id": "l1.handshake.basic",
+      "outcome": "pass",
+      "evidence_paths": [
+        "artifacts/evidence/handshake-basic.log"
+      ]
+    },
+    {
+      "id": "l1.session.open_close",
+      "outcome": "fail",
+      "failure_kind": "assertion_failed",
+      "message": "session_close_ack was not observed before timeout",
+      "evidence_paths": [
+        "artifacts/evidence/session-open-close.trace.json"
+      ]
+    }
+  ]
+}

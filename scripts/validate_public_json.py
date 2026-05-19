@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+try:
+    from jsonschema import Draft202012Validator
+except ImportError as exc:  # pragma: no cover - exercised in CI/runtime, not unit tests
+    raise SystemExit(
+        "missing Python dependency 'jsonschema'; install it with 'python -m pip install jsonschema'"
+    ) from exc
+
+
+def load_json(path: Path) -> object:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise SystemExit(f"failed to read JSON file {path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"failed to parse JSON file {path}: {exc}") from exc
+
+
+def validate_json(schema_path: Path, instance_path: Path) -> None:
+    schema = load_json(schema_path)
+    instance = load_json(instance_path)
+    validator = Draft202012Validator(schema)
+    errors = sorted(validator.iter_errors(instance), key=lambda error: list(error.absolute_path))
+    if not errors:
+        return
+
+    details = []
+    for error in errors:
+        json_path = "/".join(str(part) for part in error.absolute_path) or "<root>"
+        details.append(f"- {json_path}: {error.message}")
+
+    raise SystemExit(
+        f"schema validation failed for {instance_path} against {schema_path}:\n"
+        + "\n".join(details)
+    )
+
+
+def find_repo_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (candidate / "schemas" / "protocol-manifest.schema.json").exists():
+            return candidate
+    raise SystemExit(f"failed to locate repository root from {start}")
+
+
+def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
+    protocol_manifest_path = protocol_manifest_path.resolve()
+    protocol_root = protocol_manifest_path.parent
+    repo_root = find_repo_root(protocol_root)
+    schema_root = repo_root / "schemas"
+
+    validate_json(schema_root / "protocol-manifest.schema.json", protocol_manifest_path)
+    protocol_manifest = load_json(protocol_manifest_path)
+    if not isinstance(protocol_manifest, dict):
+        raise SystemExit(f"protocol manifest must be a JSON object: {protocol_manifest_path}")
+
+    for relative_path in protocol_manifest.get("case_manifests", []):
+        validate_json(schema_root / "case-manifest.schema.json", protocol_root / relative_path)
+
+    example_capabilities = protocol_root / "example-capabilities.json"
+    if example_capabilities.exists():
+        validate_json(schema_root / "capability-manifest.schema.json", example_capabilities)
+
+    for relative_path in protocol_manifest.get("vector_recipe_manifests", []):
+        if relative_path:
+            validate_json(
+                schema_root / "semantic-vector-recipes.schema.json",
+                protocol_root / relative_path,
+            )
+
+    for relative_path in protocol_manifest.get("vector_manifests", []):
+        if relative_path:
+            validate_json(schema_root / "vector-manifest.schema.json", protocol_root / relative_path)
+
+    docs_examples = repo_root / "docs" / "examples"
+    adapter_plan_example = docs_examples / "adapter-execution-plan.sample.json"
+    if adapter_plan_example.exists():
+        validate_json(schema_root / "adapter-execution-plan.schema.json", adapter_plan_example)
+
+    adapter_results_example = docs_examples / "adapter-case-results.sample.json"
+    if adapter_results_example.exists():
+        validate_json(schema_root / "adapter-case-results.schema.json", adapter_results_example)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate public conformance JSON artifacts against suite-owned schemas."
+    )
+    parser.add_argument(
+        "--protocol",
+        required=True,
+        type=Path,
+        help="Path to protocol/<version>/manifest.json",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    validate_protocol_baseline(args.protocol)
+    print(f"validated public JSON for {args.protocol}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,90 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "manifest_name": "l1-data-plane",
+  "cases": [
+    {
+      "id": "l1.frame_submit.tensor.inline.routing.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "frame_submit.tensor.inline",
+      "required_capabilities": [
+        "frame_submit.tensor.inline",
+        "result_push.basic"
+      ],
+      "description": "Validate Preview3 inline tensor submit routing, including session-scoped header requirements and operation-scoped metadata boundaries."
+    },
+    {
+      "id": "l1.result_push.basic.terminal.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "result_push.basic",
+      "required_capabilities": [
+        "frame_submit.tensor.inline",
+        "result_push.basic"
+      ],
+      "description": "Validate Preview3 result delivery for the minimum submit path, including terminal versus partial semantics and stable operation termination behavior."
+    },
+    {
+      "id": "l1.operation.lifecycle.progression.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "operation.lifecycle",
+      "required_capabilities": [
+        "operation.lifecycle"
+      ],
+      "description": "Validate Preview3 lifecycle progression for accepted, running, partial, and completed states without collapsing partial delivery into terminal completion."
+    },
+    {
+      "id": "l1.operation.lifecycle.waiting_tool.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "operation.lifecycle",
+      "required_capabilities": [
+        "operation.lifecycle"
+      ],
+      "description": "Validate Preview3 waiting_tool as a public lifecycle state while keeping tool arguments, tool results, and rich event payloads inside schema/profile payloads rather than fixed public metadata."
+    },
+    {
+      "id": "l1.operation.lifecycle.terminal_resolution.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "operation.lifecycle",
+      "required_capabilities": [
+        "operation.lifecycle"
+      ],
+      "description": "Validate Preview3 terminal lifecycle resolution keeps cancelled, failed, superseded, and completed distinct, rather than collapsing all terminal outcomes into one generic final state."
+    },
+    {
+      "id": "l1.operation.cancel_scope.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "operation.cancel_scope",
+      "required_capabilities": [
+        "operation.cancel_scope"
+      ],
+      "description": "Validate Preview3 cancel_scope semantics across single-operation, subtree, operation_group, and whole-session cancellation boundaries."
+    },
+    {
+      "id": "l1.typed_payload.descriptor.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "payload.typed",
+      "required_capabilities": [
+        "payload.typed"
+      ],
+      "description": "Validate the Preview3 24-byte typed payload descriptor layout, descriptor flag semantics, and offset/length interpretation rules."
+    },
+    {
+      "id": "l1.token_profile.partial.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "profile.token",
+      "required_capabilities": [
+        "profile.token",
+        "payload.typed"
+      ],
+      "description": "Validate Preview3 token-profile partial semantics, including consumable chunks, stop-reason boundaries, and non-tensor sequence interpretation."
+    }
+  ]
+}

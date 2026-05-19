@@ -1,0 +1,109 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "manifest_name": "l1-control-plane",
+  "cases": [
+    {
+      "id": "l1.handshake.capability_window.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "handshake.basic",
+      "required_capabilities": [
+        "handshake.basic"
+      ],
+      "description": "Validate Preview3 handshake capability negotiation and NNRP/1.0 code-level identity without introducing a preview-only wire marker."
+    },
+    {
+      "id": "l1.session.open.fixed_metadata.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Validate Preview3 SESSION_OPEN fixed metadata semantics, including default schema context, resume and auth block lengths, and reserved-field rejection."
+    },
+    {
+      "id": "l1.session.open_ack.fixed_metadata.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Validate Preview3 SESSION_OPEN_ACK metadata, granted credits, flag downgrade behavior, and stable session error-code reporting."
+    },
+    {
+      "id": "l1.session.close.state_machine.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Validate Preview3 SESSION_CLOSE and SESSION_CLOSE_ACK routing, draining transitions, and close-status state-machine behavior."
+    },
+    {
+      "id": "l1.flow_update.connection.scope.validation",
+      "layer": "L1",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Validate Preview3 connection-scope FLOW_UPDATE routing: header session_id and operation_id stay zero, only connection_credit is consumed, and the update does not leak per-session semantics."
+    },
+    {
+      "id": "l1.flow_update.session.scope.validation",
+      "layer": "L1",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Validate Preview3 session-scope FLOW_UPDATE routing: header session_id targets the owning session, operation_id remains zero, and session_credit/backpressure semantics stay session-local."
+    },
+    {
+      "id": "l1.flow_update.operation.scope.validation",
+      "layer": "L1",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Validate Preview3 operation-scope FLOW_UPDATE routing: operation_id is non-zero, operation_credit is preferred, and drain_in_flight_only semantics stay bound to the targeted operation."
+    },
+    {
+      "id": "l1.flow_update.credit_epoch.monotonicity.validation",
+      "layer": "L1",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Validate Preview3 credit_epoch monotonicity per scope, including stale-update rejection and the requirement that newer FLOW_UPDATE instances supersede older backpressure state."
+    },
+    {
+      "id": "l1.session.resume.from_operation.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "session.resume",
+      "required_capabilities": [
+        "session.resume",
+        "session.open_close"
+      ],
+      "description": "Validate Preview3 resume_from_operation_id semantics, including resumed SESSION_OPEN_ACK status and the requirement that session recovery resumes from an operation waterline rather than from frame-level objects."
+    },
+    {
+      "id": "l1.session.resume.rejected.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "session.resume",
+      "required_capabilities": [
+        "session.resume",
+        "session.open_close"
+      ],
+      "description": "Validate Preview3 resume rejection behavior: invalid, expired, unauthorized, or incompatible resume_token requests must return session_error_code=resume_rejected without inventing a frame-level recovery path."
+    }
+  ]
+}

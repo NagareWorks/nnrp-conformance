@@ -1,0 +1,137 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "manifest_name": "l1-schema-cache",
+  "cases": [
+    {
+      "id": "l1.cache.lease_owner_scope.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Validate Preview3 cache lease_owner_scope semantics, including the requirement that lease ownership remains a public interoperability contract rather than a runtime-private policy hint."
+    },
+    {
+      "id": "l1.cache.object_version.monotonicity.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Validate Preview3 object_version monotonicity, including rejection of stale writes and the requirement that version comparison is performed on the public cache object rather than on runtime-private internals."
+    },
+    {
+      "id": "l1.cache.dependency_invalidation.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Validate Preview3 dependency_invalid behavior when a cache object depends on schema or cache entries that are expired, revoked, or replaced underneath it."
+    },
+    {
+      "id": "l1.cache.error_code.cache_miss.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Validate Preview3 cache_error_code=cache_miss is reported for missing public cache objects rather than collapsing the outcome into a generic transport or validation failure."
+    },
+    {
+      "id": "l1.cache.error_code.lease_expired.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Validate Preview3 cache_error_code=lease_expired when a lease-backed cache object is accessed after its public lease window closes."
+    },
+    {
+      "id": "l1.cache.error_code.version_mismatch.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Validate Preview3 cache_error_code=version_mismatch when callers target the wrong object_version instead of silently rebinding to a newer cache object version."
+    },
+    {
+      "id": "l1.cache.error_code.dependency_invalid.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Validate Preview3 cache_error_code=dependency_invalid when dependency chains become unusable even though the directly addressed object still exists."
+    },
+    {
+      "id": "l1.cache.error_code.schema_mismatch.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Validate Preview3 cache_error_code=schema_mismatch when a cached object is addressed through an incompatible public schema binding."
+    },
+    {
+      "id": "l1.schema.descriptor.layout.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Validate the Preview3 32-byte schema descriptor header layout, including stable field offsets for schema_id, schema_version, profile binding, and applicability scope."
+    },
+    {
+      "id": "l1.schema.descriptor.flags.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Validate Preview3 schema_flags bit assignments, including cacheable, critical, and default-bindable semantics without allowing private bindings to redefine the public bit vocabulary."
+    },
+    {
+      "id": "l1.schema.descriptor.default_stream.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Validate Preview3 default stream semantics in schema descriptors, including append-style token streams versus single-shot payload bindings."
+    },
+    {
+      "id": "l1.schema.registry.install_update.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Validate Preview3 schema install and update flows, including stable schema_error_code reporting for schema_unknown, schema_version_unknown, and schema_hash_conflict outcomes."
+    },
+    {
+      "id": "l1.schema.registry.invalidate_conflict.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Validate Preview3 schema invalidate and conflict flows, including schema_incompatible, schema_dependency_missing, and schema_update_rejected handling."
+    }
+  ]
+}

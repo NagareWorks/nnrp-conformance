@@ -1,0 +1,32 @@
+{
+  "$schema": "../../schemas/adapter-execution-plan.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "suite_version": "0.1.0",
+  "implementation_name": "sample-adapter",
+  "artifacts": {
+    "results_path": "artifacts/adapter-results.json",
+    "evidence_dir": "artifacts/evidence"
+  },
+  "cases": [
+    {
+      "id": "l1.handshake.basic",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "handshake.basic",
+      "required_capabilities": [
+        "handshake.basic"
+      ],
+      "description": "Handshake succeeds with the Preview3 minimum metadata set."
+    },
+    {
+      "id": "l1.session.open_close",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "session.basic",
+      "required_capabilities": [
+        "session.basic"
+      ],
+      "description": "A session can be opened and closed cleanly on a single connection."
+    }
+  ]
+}

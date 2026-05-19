@@ -1,0 +1,45 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "manifest_name": "l0-wire-errors",
+  "cases": [
+    {
+      "id": "l0.header.length_mismatch.reject",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "header.invalid_length.reject",
+      "required_capabilities": [],
+      "description": "Reject Preview3 packets whose declared meta_len and body_len do not match the actual byte shape on the wire."
+    },
+    {
+      "id": "l0.session_open.reserved_fields.reject",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Reject Preview3 SESSION_OPEN fixed metadata that sets reserved fields or non-frozen bits instead of sending them as zero."
+    },
+    {
+      "id": "l0.session_open_ack.reserved_fields.reject",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Reject Preview3 SESSION_OPEN_ACK fixed metadata that sets reserved fields or unknown session_flags_ack bits outside the frozen public mask."
+    },
+    {
+      "id": "l0.flow_update.reserved_flags.reject",
+      "layer": "L0",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Reject Preview3 FLOW_UPDATE metadata when reserved flow_flags bits 4-31 are set instead of cleared on the wire."
+    }
+  ]
+}

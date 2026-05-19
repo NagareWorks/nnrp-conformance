@@ -1,0 +1,150 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "manifest_name": "l0-wire-vectors",
+  "cases": [
+    {
+      "id": "l0.session_open.metadata.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Round-trip the canonical Preview3 SESSION_OPEN fixed metadata vector, including schema defaults, lease hints, and resume/auth block lengths."
+    },
+    {
+      "id": "l0.session_open_ack.metadata.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Round-trip the canonical Preview3 SESSION_OPEN_ACK metadata vector, including granted credits, route_scope_id, and session_flags_ack bits."
+    },
+    {
+      "id": "l0.session_close.metadata.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Round-trip the canonical Preview3 SESSION_CLOSE fixed metadata vector with draining policy and last_operation_id waterline."
+    },
+    {
+      "id": "l0.session_close_ack.metadata.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "session.open_close",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Round-trip the canonical Preview3 SESSION_CLOSE_ACK fixed metadata vector for draining-to-closed state transitions."
+    },
+    {
+      "id": "l0.flow_update.packet.golden",
+      "layer": "L0",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Round-trip the canonical Preview3 FLOW_UPDATE packet vector with session-scope credit routing, retry-after, and backpressure flags."
+    },
+    {
+      "id": "l0.flow_update.connection.packet.golden",
+      "layer": "L0",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Round-trip the canonical Preview3 connection-scope FLOW_UPDATE packet vector and preserve connection_credit-only routing semantics."
+    },
+    {
+      "id": "l0.flow_update.operation.packet.golden",
+      "layer": "L0",
+      "status": "experimental",
+      "feature": "flow_update",
+      "required_capabilities": [
+        "flow_update"
+      ],
+      "description": "Round-trip the canonical Preview3 operation-scope FLOW_UPDATE packet vector with non-zero operation_id, retry-after, and drain_in_flight_only behavior."
+    },
+    {
+      "id": "l0.session_resume.metadata.golden",
+      "layer": "L0",
+      "status": "optional",
+      "feature": "session.resume",
+      "required_capabilities": [
+        "session.resume",
+        "session.open_close"
+      ],
+      "description": "Round-trip the canonical Preview3 SESSION_OPEN resume-request metadata vector, including resume token length and resumed-session defaults."
+    },
+    {
+      "id": "l0.session_resume_ack.resumed.golden",
+      "layer": "L0",
+      "status": "optional",
+      "feature": "session.resume",
+      "required_capabilities": [
+        "session.resume",
+        "session.open_close"
+      ],
+      "description": "Round-trip the canonical Preview3 SESSION_OPEN_ACK resumed metadata vector and preserve the resumed session_status semantics."
+    },
+    {
+      "id": "l0.session_resume_ack.rejected.golden",
+      "layer": "L0",
+      "status": "optional",
+      "feature": "session.resume",
+      "required_capabilities": [
+        "session.resume",
+        "session.open_close"
+      ],
+      "description": "Round-trip the canonical Preview3 SESSION_OPEN_ACK resume-rejected metadata vector and preserve the stable resume_rejected error code."
+    },
+    {
+      "id": "l0.schema.descriptor.header.golden",
+      "layer": "L0",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Round-trip the canonical Preview3 32-byte schema descriptor header vector, including schema_flags and default stream semantics."
+    },
+    {
+      "id": "l0.cache.error_code.family.golden",
+      "layer": "L0",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": [
+        "cache.lifecycle"
+      ],
+      "description": "Round-trip the canonical Preview3 cache_error_code raw wire values and preserve the frozen cache_miss, lease_expired, version_mismatch, dependency_invalid, and schema_mismatch family assignments."
+    },
+    {
+      "id": "l0.schema.error_code.family.golden",
+      "layer": "L0",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Round-trip the canonical Preview3 schema_error_code raw wire values and preserve the frozen schema_unknown, schema_version_unknown, schema_hash_conflict, schema_incompatible, schema_dependency_missing, and schema_update_rejected assignments."
+    },
+    {
+      "id": "l0.typed_payload.descriptor.golden",
+      "layer": "L0",
+      "status": "optional",
+      "feature": "payload.typed",
+      "required_capabilities": [
+        "payload.typed"
+      ],
+      "description": "Round-trip the canonical Preview3 24-byte typed payload descriptor vector, including partial semantics and schema binding fields."
+    }
+  ]
+}

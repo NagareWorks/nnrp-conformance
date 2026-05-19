@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/adapter-execution-plan.schema.json",
+  "title": "NNRP Adapter Execution Plan",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "suite_version",
+    "implementation_name",
+    "artifacts",
+    "cases"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string"
+    },
+    "suite_version": {
+      "type": "string"
+    },
+    "implementation_name": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "object",
+      "required": [
+        "results_path",
+        "evidence_dir"
+      ],
+      "properties": {
+        "results_path": {
+          "type": "string"
+        },
+        "evidence_dir": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "layer",
+          "status",
+          "feature",
+          "required_capabilities",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "L0",
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "mandatory",
+              "optional",
+              "experimental",
+              "deprecated"
+            ]
+          },
+          "feature": {
+            "type": "string"
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "manifest_name": "l2-binding-driver",
+  "cases": [
+    {
+      "id": "l2.payload.typed.buffer_ownership.relative_region.validation",
+      "layer": "L2",
+      "status": "optional",
+      "feature": "payload.typed",
+      "required_capabilities": [
+        "payload.typed"
+      ],
+      "description": "Validate Preview3 typed-payload buffer ownership at the SDK or FFI boundary: callback, polling, or borrowed-buffer adapters must preserve offset and length semantics relative to the typed payload frame region instead of rebasing slices against a whole-packet body or a runtime-private subregion."
+    },
+    {
+      "id": "l2.payload.typed.callback_polling.descriptor_consistency.validation",
+      "layer": "L2",
+      "status": "optional",
+      "feature": "payload.typed",
+      "required_capabilities": [
+        "payload.typed"
+      ],
+      "description": "Validate Preview3 typed-payload descriptor exposure stays consistent across callback and polling drive modes: the same public descriptor fields, flags, and stream semantics must be observable without a binding rewriting them into transport-local or runtime-private metadata."
+    },
+    {
+      "id": "l2.profile.token.partial.callback_polling.validation",
+      "layer": "L2",
+      "status": "optional",
+      "feature": "profile.token",
+      "required_capabilities": [
+        "profile.token",
+        "payload.typed"
+      ],
+      "description": "Validate Preview3 token-profile partial delivery stays consumable and non-terminal across callback and polling adapters: the binding must preserve chunk ordering, partial versus terminal meaning, and stop-reason visibility instead of collapsing them into one generic text-stream callback."
+    },
+    {
+      "id": "l2.result_push.basic.event_pump.single_terminal.validation",
+      "layer": "L2",
+      "status": "optional",
+      "feature": "result_push.basic",
+      "required_capabilities": [
+        "frame_submit.tensor.inline",
+        "result_push.basic"
+      ],
+      "description": "Validate Preview3 result/event pump behavior at the binding layer: per-operation delivery order must remain stable and the terminal result must surface exactly once, regardless of whether the implementation drives completion through callbacks, polling, or a background event pump."
+    },
+    {
+      "id": "l2.schema.registry.error_mapping.critical_unknown.validation",
+      "layer": "L2",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Validate Preview3 schema-registry error mapping at the SDK boundary: when a critical schema, version, or dependency is unknown, the binding must surface stable public schema_error_code outcomes such as schema_unknown, schema_version_unknown, or schema_dependency_missing instead of silently skipping the descriptor or rewriting the failure as a generic transport error."
+    },
+    {
+      "id": "l2.schema.registry.conflict_error_mapping.validation",
+      "layer": "L2",
+      "status": "optional",
+      "feature": "schema.registry",
+      "required_capabilities": [
+        "schema.registry"
+      ],
+      "description": "Validate Preview3 schema conflict reporting remains protocol-shaped after crossing a driver or FFI layer: schema_hash_conflict and schema_update_rejected must stay distinct public outcomes rather than being merged into one host-specific installation failure."
+    }
+  ]
+}

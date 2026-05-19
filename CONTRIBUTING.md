@@ -68,6 +68,7 @@ Before opening or merging a PR, prefer the narrowest validation that proves the 
 - `cargo fmt --all --check`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo test --workspace`
+- `python scripts/validate_public_json.py --protocol protocol/nnrp-1-preview3/manifest.json` when changing public schemas, baseline JSON files, or schema-bound examples
 - `cargo run -p nnrp-conformance-runner -- summary --protocol protocol/nnrp-1-preview2/manifest.json --capabilities protocol/nnrp-1-preview2/example-capabilities.json` when changing baseline selection, manifests, or report shape
 - `cargo run -p nnrp-conformance-runner -- generate-vectors --recipe protocol/nnrp-1-preview2/vectors/semantic-vectors.json --output artifacts/local-preview2-vectors.json` and `verify-vectors --recipe ... --manifest ...` when changing recipe-backed vector generation
 - `cargo run -p nnrp-conformance-runner -- compare-vector-manifests --expected artifacts/local-preview2-vectors.json --actual <sdk-manifest>` when changing SDK comparison flow or the suite-owned action
@@ -78,12 +79,16 @@ PRs that affect CI, schemas, manifest contracts, or future adapter integration s
 
 Do not silently rewrite historical protocol baselines. If a versioned baseline changes materially, create a new baseline revision intentionally and document why.
 
+Baseline revisions are tagged independently from SDK release tags. Use repository-local baseline tags in the form `baseline/<protocol-version>/r<N>` so protocol baseline history remains separable from SDK package versioning.
+
 When preparing a release-style PR:
 
 - update the intended baseline or suite version source intentionally
 - confirm protocol manifest, case manifests, and capability/report contracts stay aligned
 - confirm CI still selects an explicit protocol baseline rather than inferring repository state
 - note any manual GitHub tagging or release steps if they are required
+
+When adding a new preview line, do not retrofit an older directory into the new protocol shape. Add a new `protocol/<protocol-version>/` directory, keep older directories intact, and let CI discover the additional `manifest.json` naturally.
 
 The core rule of this repository is that CI must always select an explicit protocol baseline. Do not make conformance depend on branch naming, implicit latest-version assumptions, or repository-local implementation state.
 

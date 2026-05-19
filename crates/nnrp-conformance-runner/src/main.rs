@@ -1,10 +1,14 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use nnrp_conformance_fixtures::{
-    CapabilityManifest, CaseManifest, ProtocolManifest, SemanticVectorManifest, VectorManifest,
-    build_vector_manifest, load_json_file, verify_vector_manifest,
+    AdapterArtifactContext, CapabilityManifest, CaseManifest, ProtocolManifest,
+    SemanticVectorManifest, VectorManifest, build_vector_manifest, load_json_file,
+    verify_vector_manifest,
 };
-use nnrp_conformance_runner::{build_execution_plan, build_execution_plan_for_manifests};
+use nnrp_conformance_runner::{
+    build_adapter_execution_plan, build_adapter_execution_plan_for_manifests, build_execution_plan,
+    build_execution_plan_for_manifests,
+};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -27,6 +31,22 @@ enum Command {
         cases: Option<PathBuf>,
         #[arg(long)]
         capabilities: Option<PathBuf>,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    AdapterPlan {
+        #[arg(long)]
+        protocol: PathBuf,
+        #[arg(long)]
+        cases: Option<PathBuf>,
+        #[arg(long)]
+        capabilities: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, default_value = "artifacts/adapter-results.json")]
+        results_path: PathBuf,
+        #[arg(long, default_value = "artifacts/evidence")]
+        evidence_dir: PathBuf,
     },
     GenerateVectors {
         #[arg(long)]
@@ -56,6 +76,7 @@ fn main() -> Result<()> {
             protocol,
             cases,
             capabilities,
+            output,
         } => {
             let protocol_manifest: ProtocolManifest = load_json_file(&protocol)?;
             let capability_manifest = match &capabilities {
@@ -98,7 +119,69 @@ fn main() -> Result<()> {
                     capabilities.as_deref(),
                 )?
             };
-            println!("{}", serde_json::to_string_pretty(&summary)?);
+            let rendered = format!("{}\n", serde_json::to_string_pretty(&summary)?);
+            if let Some(output_path) = output {
+                std::fs::write(output_path, rendered)?;
+            } else {
+                print!("{rendered}");
+            }
+        }
+        Command::AdapterPlan {
+            protocol,
+            cases,
+            capabilities,
+            output,
+            results_path,
+            evidence_dir,
+        } => {
+            let protocol_manifest: ProtocolManifest = load_json_file(&protocol)?;
+            let capability_manifest: CapabilityManifest = load_json_file(&capabilities)?;
+
+            let case_paths = match cases {
+                Some(case_path) => vec![case_path],
+                None => {
+                    let protocol_dir = protocol.parent().unwrap_or(std::path::Path::new("."));
+                    protocol_manifest
+                        .case_manifests
+                        .iter()
+                        .map(|relative_path| protocol_dir.join(relative_path))
+                        .collect()
+                }
+            };
+            let case_manifests = case_paths
+                .iter()
+                .map(load_json_file::<CaseManifest>)
+                .collect::<Result<Vec<_>, _>>()?;
+            let artifacts = AdapterArtifactContext {
+                results_path: results_path.display().to_string(),
+                evidence_dir: evidence_dir.display().to_string(),
+            };
+
+            let plan = if case_manifests.len() == 1 {
+                build_adapter_execution_plan(
+                    &protocol_manifest,
+                    &case_manifests[0],
+                    &capability_manifest,
+                    &case_paths[0],
+                    &capabilities,
+                    artifacts.clone(),
+                )?
+            } else {
+                build_adapter_execution_plan_for_manifests(
+                    &protocol_manifest,
+                    case_manifests
+                        .iter()
+                        .zip(case_paths.iter())
+                        .map(|(manifest, path)| (manifest, path.as_path())),
+                    &capability_manifest,
+                    &capabilities,
+                    artifacts,
+                )?
+            };
+            std::fs::write(
+                output,
+                format!("{}\n", serde_json::to_string_pretty(&plan)?),
+            )?;
         }
         Command::GenerateVectors { recipe, output } => {
             let semantic_manifest: SemanticVectorManifest = load_json_file(&recipe)?;

@@ -4,7 +4,14 @@
   "suite_version": "0.1.0",
   "status": "draft",
   "case_manifests": [
-    "cases/mandatory-core.json"
+    "cases/mandatory-core.json",
+    "cases/l0-wire-vectors.json",
+    "cases/l0-wire-errors.json",
+    "cases/l1-control-plane.json",
+    "cases/l1-session-container.json",
+    "cases/l1-data-plane.json",
+    "cases/l1-schema-cache.json",
+    "cases/l2-binding-driver.json"
   ],
   "vector_manifests": [
     "vectors/golden-vectors.json"

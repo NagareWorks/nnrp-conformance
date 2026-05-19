@@ -7,6 +7,7 @@
     "protocol_version",
     "implementation_name",
     "summary",
+    "compatibility_matrix",
     "cases"
   ],
   "properties": {
@@ -38,6 +39,88 @@
         }
       },
       "additionalProperties": true
+    },
+    "compatibility_matrix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "feature",
+          "required_capabilities",
+          "summary",
+          "statuses",
+          "case_ids"
+        ],
+        "properties": {
+          "feature": {
+            "type": "string"
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "selected_cases",
+              "not_claimed_cases",
+              "informational_cases"
+            ],
+            "properties": {
+              "selected_cases": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "not_claimed_cases": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "informational_cases": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "statuses": {
+            "type": "object",
+            "required": [
+              "mandatory_cases",
+              "optional_cases",
+              "experimental_cases",
+              "deprecated_cases"
+            ],
+            "properties": {
+              "mandatory_cases": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "optional_cases": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "experimental_cases": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "deprecated_cases": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "case_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "cases": {
       "type": "array",

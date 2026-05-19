@@ -1,0 +1,40 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "manifest_name": "l1-session-container",
+  "cases": [
+    {
+      "id": "l1.connection.session_container.parallel_open.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "session.multi_session",
+      "required_capabilities": [
+        "session.multi_session",
+        "session.open_close"
+      ],
+      "description": "Validate Preview3 treats a connection as a multi-session container by allowing multiple live session_ids without cross-session state or credit leakage."
+    },
+    {
+      "id": "l1.session.close.sibling_survival.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "session.multi_session",
+      "required_capabilities": [
+        "session.multi_session",
+        "session.open_close"
+      ],
+      "description": "Validate closing one Preview3 session does not implicitly close the transport or invalidate sibling sessions that remain active on the same connection."
+    },
+    {
+      "id": "l1.connection.close.session_cascade.validation",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "session.multi_session",
+      "required_capabilities": [
+        "session.multi_session",
+        "session.open_close"
+      ],
+      "description": "Validate connection-level CLOSE tears down remaining Preview3 sessions as a container shutdown, rather than reusing per-session close semantics or permitting further session traffic."
+    }
+  ]
+}
