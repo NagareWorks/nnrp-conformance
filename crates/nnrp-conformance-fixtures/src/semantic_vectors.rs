@@ -23,16 +23,16 @@ pub struct GoldenVector {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Preview2SemanticVectorManifest {
+pub struct SemanticVectorManifest {
     #[serde(rename = "$schema", default)]
     pub schema: Option<String>,
     pub protocol_version: String,
-    pub vectors: Vec<Preview2VectorRecipe>,
+    pub vectors: Vec<SemanticVectorRecipe>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "recipe_type", rename_all = "snake_case")]
-pub enum Preview2VectorRecipe {
+pub enum SemanticVectorRecipe {
     Header {
         name: String,
         description: String,
@@ -432,16 +432,13 @@ pub enum ResultClassName {
     Degraded,
 }
 
-pub fn build_preview2_vector_manifest(
-    semantic_manifest: &Preview2SemanticVectorManifest,
+pub fn build_vector_manifest(
+    semantic_manifest: &SemanticVectorManifest,
     generated_from: &str,
 ) -> Result<VectorManifest, FixtureError> {
-    if semantic_manifest.protocol_version != "nnrp-1-preview2" {
+    if semantic_manifest.protocol_version.trim().is_empty() {
         return Err(FixtureError::Validation {
-            message: format!(
-                "preview2 semantic vector manifest must declare nnrp-1-preview2, got {}",
-                semantic_manifest.protocol_version
-            ),
+            message: "semantic vector manifest must declare a protocol_version".to_string(),
         });
     }
 
@@ -460,21 +457,21 @@ pub fn build_preview2_vector_manifest(
     Ok(VectorManifest {
         schema: Some("../../schemas/vector-manifest.schema.json".to_string()),
         protocol_version: semantic_manifest.protocol_version.clone(),
-        generator: Some("nnrp-conformance preview2 semantic vector generator".to_string()),
+        generator: Some("nnrp-conformance semantic vector generator".to_string()),
         generated_from: Some(generated_from.to_string()),
         vectors,
     })
 }
 
-pub fn verify_preview2_vector_manifest(
-    semantic_manifest: &Preview2SemanticVectorManifest,
+pub fn verify_vector_manifest(
+    semantic_manifest: &SemanticVectorManifest,
     checked_in_manifest: &VectorManifest,
     generated_from: &str,
 ) -> Result<(), FixtureError> {
-    let generated_manifest = build_preview2_vector_manifest(semantic_manifest, generated_from)?;
+    let generated_manifest = build_vector_manifest(semantic_manifest, generated_from)?;
     if &generated_manifest != checked_in_manifest {
         return Err(FixtureError::Validation {
-            message: "preview2 vector manifest does not match the semantic recipes".to_string(),
+            message: "vector manifest does not match the semantic recipes".to_string(),
         });
     }
 
@@ -482,10 +479,10 @@ pub fn verify_preview2_vector_manifest(
 }
 
 fn render_recipe(
-    recipe: &Preview2VectorRecipe,
+    recipe: &SemanticVectorRecipe,
 ) -> Result<(String, String, String, Vec<u8>), FixtureError> {
     match recipe {
-        Preview2VectorRecipe::Header {
+        SemanticVectorRecipe::Header {
             name,
             description,
             version_major,
@@ -517,7 +514,7 @@ fn render_recipe(
                 trace_id: *trace_id,
             }),
         )),
-        Preview2VectorRecipe::ClientHelloMetadata {
+        SemanticVectorRecipe::ClientHelloMetadata {
             name,
             description,
             min_version_major,
@@ -573,7 +570,7 @@ fn render_recipe(
                 payload,
             ))
         }
-        Preview2VectorRecipe::SessionPatchAckMetadata {
+        SemanticVectorRecipe::SessionPatchAckMetadata {
             name,
             description,
             ack_status,
@@ -613,7 +610,7 @@ fn render_recipe(
                 payload,
             ))
         }
-        Preview2VectorRecipe::FlowUpdatePacket {
+        SemanticVectorRecipe::FlowUpdatePacket {
             name,
             description,
             version_major,
@@ -670,7 +667,7 @@ fn render_recipe(
                 packet,
             ))
         }
-        Preview2VectorRecipe::ResultHintPacket {
+        SemanticVectorRecipe::ResultHintPacket {
             name,
             description,
             version_major,
@@ -714,7 +711,7 @@ fn render_recipe(
                 packet,
             ))
         }
-        Preview2VectorRecipe::FrameSubmitMetadata {
+        SemanticVectorRecipe::FrameSubmitMetadata {
             name,
             description,
             src_width,
@@ -776,7 +773,7 @@ fn render_recipe(
                 payload,
             ))
         }
-        Preview2VectorRecipe::ResultPushMetadata {
+        SemanticVectorRecipe::ResultPushMetadata {
             name,
             description,
             status_code,
@@ -830,7 +827,7 @@ fn render_recipe(
                 payload,
             ))
         }
-        Preview2VectorRecipe::BodyRegionPrelude {
+        SemanticVectorRecipe::BodyRegionPrelude {
             name,
             description,
             inline_object_bytes,
@@ -856,7 +853,7 @@ fn render_recipe(
                 payload,
             ))
         }
-        Preview2VectorRecipe::ObjectReferenceBlock {
+        SemanticVectorRecipe::ObjectReferenceBlock {
             name,
             description,
             object_kind,
@@ -878,7 +875,7 @@ fn render_recipe(
                 payload,
             ))
         }
-        Preview2VectorRecipe::TypedPayloadDescriptor {
+        SemanticVectorRecipe::TypedPayloadDescriptor {
             name,
             description,
             payload_kind,
@@ -901,7 +898,7 @@ fn render_recipe(
                 payload,
             ))
         }
-        Preview2VectorRecipe::TypedPayloadDescriptorRegion {
+        SemanticVectorRecipe::TypedPayloadDescriptorRegion {
             name,
             description,
             frames,
@@ -911,7 +908,7 @@ fn render_recipe(
             description.clone(),
             pack_typed_payload_descriptor_region(frames),
         )),
-        Preview2VectorRecipe::TypedPayloadFrameRegion {
+        SemanticVectorRecipe::TypedPayloadFrameRegion {
             name,
             description,
             frames,

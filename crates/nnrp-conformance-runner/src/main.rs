@@ -1,9 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use nnrp_conformance_fixtures::{
-    CapabilityManifest, CaseManifest, Preview2SemanticVectorManifest, ProtocolManifest,
-    VectorManifest, build_preview2_vector_manifest, load_json_file,
-    verify_preview2_vector_manifest,
+    CapabilityManifest, CaseManifest, ProtocolManifest, SemanticVectorManifest, VectorManifest,
+    build_vector_manifest, load_json_file, verify_vector_manifest,
 };
 use nnrp_conformance_runner::{build_execution_plan, build_execution_plan_for_manifests};
 use std::collections::BTreeMap;
@@ -102,28 +101,27 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         Command::GenerateVectors { recipe, output } => {
-            let semantic_manifest: Preview2SemanticVectorManifest = load_json_file(&recipe)?;
+            let semantic_manifest: SemanticVectorManifest = load_json_file(&recipe)?;
             let generated_from = recipe
                 .file_name()
                 .and_then(|name| name.to_str())
                 .map(|name| format!("vectors/{name}"))
                 .unwrap_or_else(|| recipe.display().to_string());
-            let vector_manifest =
-                build_preview2_vector_manifest(&semantic_manifest, &generated_from)?;
+            let vector_manifest = build_vector_manifest(&semantic_manifest, &generated_from)?;
             std::fs::write(
                 &output,
                 format!("{}\n", serde_json::to_string_pretty(&vector_manifest)?),
             )?;
         }
         Command::VerifyVectors { recipe, manifest } => {
-            let semantic_manifest: Preview2SemanticVectorManifest = load_json_file(&recipe)?;
+            let semantic_manifest: SemanticVectorManifest = load_json_file(&recipe)?;
             let vector_manifest: VectorManifest = load_json_file(&manifest)?;
             let generated_from = recipe
                 .file_name()
                 .and_then(|name| name.to_str())
                 .map(|name| format!("vectors/{name}"))
                 .unwrap_or_else(|| recipe.display().to_string());
-            verify_preview2_vector_manifest(&semantic_manifest, &vector_manifest, &generated_from)?;
+            verify_vector_manifest(&semantic_manifest, &vector_manifest, &generated_from)?;
         }
         Command::CompareVectorManifests { expected, actual } => {
             let expected_manifest: VectorManifest = load_json_file(&expected)?;

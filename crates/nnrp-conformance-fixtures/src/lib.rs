@@ -4,11 +4,11 @@ use std::fs;
 use std::path::Path;
 use thiserror::Error;
 
-mod preview2_vectors;
+mod semantic_vectors;
 
-pub use preview2_vectors::{
-    GoldenVector, Preview2SemanticVectorManifest, VectorManifest, build_preview2_vector_manifest,
-    verify_preview2_vector_manifest,
+pub use semantic_vectors::{
+    GoldenVector, SemanticVectorManifest, SemanticVectorRecipe, VectorManifest,
+    build_vector_manifest, verify_vector_manifest,
 };
 
 #[derive(Debug, Error)]
@@ -174,9 +174,8 @@ pub fn validate_protocol_alignment(
 #[cfg(test)]
 mod tests {
     use super::{
-        CapabilityManifest, CaseManifest, CaseStatus, Preview2SemanticVectorManifest,
-        ProtocolManifest, build_preview2_vector_manifest, load_json_file,
-        validate_protocol_alignment, verify_preview2_vector_manifest,
+        CapabilityManifest, CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest,
+        build_vector_manifest, load_json_file, validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -253,8 +252,8 @@ mod tests {
     }
 
     #[test]
-    fn generates_preview2_vectors_from_semantic_fixture() {
-        let semantic_manifest: Preview2SemanticVectorManifest = load_json_file(
+    fn generates_semantic_vectors_from_preview2_fixture() {
+        let semantic_manifest: SemanticVectorManifest = load_json_file(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("..")
                 .join("..")
@@ -266,8 +265,8 @@ mod tests {
         .expect("semantic vector manifest should load");
 
         let vector_manifest =
-            build_preview2_vector_manifest(&semantic_manifest, "vectors/semantic-vectors.json")
-                .expect("preview2 vectors should generate");
+            build_vector_manifest(&semantic_manifest, "vectors/semantic-vectors.json")
+                .expect("semantic vectors should generate");
 
         assert_eq!(vector_manifest.protocol_version, "nnrp-1-preview2");
         assert_eq!(
@@ -283,8 +282,8 @@ mod tests {
     }
 
     #[test]
-    fn generates_preview2_vectors_deterministically() {
-        let semantic_manifest: Preview2SemanticVectorManifest = load_json_file(
+    fn generates_semantic_vectors_deterministically() {
+        let semantic_manifest: SemanticVectorManifest = load_json_file(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("..")
                 .join("..")
@@ -296,14 +295,14 @@ mod tests {
         .expect("semantic vector manifest should load");
 
         let vector_manifest =
-            build_preview2_vector_manifest(&semantic_manifest, "vectors/semantic-vectors.json")
-                .expect("preview2 vectors should generate");
+            build_vector_manifest(&semantic_manifest, "vectors/semantic-vectors.json")
+                .expect("semantic vectors should generate");
 
-        verify_preview2_vector_manifest(
+        verify_vector_manifest(
             &semantic_manifest,
             &vector_manifest,
             "vectors/semantic-vectors.json",
         )
-        .expect("generated preview2 vectors should match semantic recipe deterministically");
+        .expect("generated semantic vectors should match semantic recipe deterministically");
     }
 }
