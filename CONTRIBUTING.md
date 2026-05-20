@@ -12,7 +12,6 @@ Use short-lived topic branches for day-to-day work:
 - `fix/<scope>-<topic>` for bug fixes in manifests, schemas, runner logic, or CI
 - `docs/<scope>-<topic>` for documentation-only changes
 - `chore/<scope>-<topic>` for maintenance, tooling, or repository hygiene
-- `release/<version>` only when stabilizing a versioned baseline or a tagged repository release
 
 Rules:
 
@@ -22,8 +21,7 @@ Rules:
 - Merge back to `main` through a pull request.
 - Do not push directly to `main`; enforce this with a GitHub ruleset or branch protection rule.
 - Do not treat topic branches as canonical protocol baselines.
-
-`release/<version>` branches are optional and should be used only when a baseline revision needs stabilization passes, schema lock review, or tagged release preparation without changing the normal merge flow on `main`.
+- This repository does not use long-lived `release/*` branches for normal work; `main` stays current and backward-compatible while historical protocol baselines remain append-only under `protocol/`.
 
 ## Commit Message Convention
 
@@ -43,8 +41,7 @@ Rules:
 - Keep the subject line imperative.
 - Keep the first line concise.
 - Use a scope only when it adds clarity.
-- You can use multiple local commits while iterating, but normal PRs from `feature/*`, `fix/*`, `docs/*`, or `chore/*` branches must be squashed to exactly one commit before review.
-- Only version-maintenance PRs that target or originate from `release/<version>` branches may keep multiple commits when that history is actually needed.
+- You can use multiple local commits while iterating, but PRs must be squashed to exactly one commit before review.
 
 ## Pull Request Expectations
 
@@ -56,7 +53,7 @@ Every PR should:
 - summarize the main manifests, schemas, crates, or CI flows changed
 - list the validation performed
 - mention public baseline impact when protocol-facing artifacts changed
-- contain exactly one commit before review unless it is a necessary `release/<version>` branch PR
+- contain exactly one commit before review
 - pass the `verify` GitHub Actions job before merge
 
 PRs that violate the normal one-commit rule are not reviewed until they are squashed.
@@ -77,16 +74,9 @@ PRs that affect CI, schemas, manifest contracts, or future adapter integration s
 
 ## Baseline and Version Discipline
 
-Do not silently rewrite historical protocol baselines. If a versioned baseline changes materially, create a new baseline revision intentionally and document why.
+Do not silently rewrite historical protocol baselines. When protocol semantics move, add or update append-only baseline directories intentionally and document why the change preserves backward compatibility for already-published protocol lines.
 
-Baseline revisions are tagged independently from SDK release tags. Use repository-local baseline tags in the form `baseline/<protocol-version>/r<N>` so protocol baseline history remains separable from SDK package versioning.
-
-When preparing a release-style PR:
-
-- update the intended baseline or suite version source intentionally
-- confirm protocol manifest, case manifests, and capability/report contracts stay aligned
-- confirm CI still selects an explicit protocol baseline rather than inferring repository state
-- note any manual GitHub tagging or release steps if they are required
+This repository does not have a package-release or baseline-freeze workflow. Historical compatibility is carried by the checked-in `protocol/<protocol-version>/` directories plus CI that always selects explicit baselines from the current `main` branch.
 
 When adding a new preview line, do not retrofit an older directory into the new protocol shape. Add a new `protocol/<protocol-version>/` directory, keep older directories intact, and let CI discover the additional `manifest.json` naturally.
 

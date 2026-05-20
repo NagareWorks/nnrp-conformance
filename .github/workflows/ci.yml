@@ -87,3 +87,30 @@ jobs:
         with:
           protocol-version: ${{ matrix.protocol_version }}
           artifact-name: conformance-${{ matrix.baseline_id }}
+
+  verify:
+    needs:
+      - discover-baselines
+      - verify-workspace
+      - verify-baselines
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enforce required CI path
+        shell: bash
+        run: |
+          if [ "${{ needs.discover-baselines.result }}" != "success" ]; then
+            echo "Baseline discovery failed."
+            exit 1
+          fi
+
+          if [ "${{ needs.verify-workspace.result }}" != "success" ]; then
+            echo "Workspace formatting, lint, or tests failed."
+            exit 1
+          fi
+
+          if [ "${{ needs.verify-baselines.result }}" != "success" ]; then
+            echo "One or more protocol baselines failed shared conformance verification."
+            exit 1
+          fi

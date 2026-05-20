@@ -88,7 +88,7 @@ cargo run -p nnrp-conformance-runner -- \
   --output artifacts/preview2-summary.json
 ```
 
-The `summary` command emits the public conformance report shape defined by `schemas/report.schema.json`, including a feature-level `compatibility_matrix` for dashboards and release notes. It is not a capability manifest and should never be stored or labeled as one.
+The `summary` command emits the public conformance report shape defined by `schemas/report.schema.json`, including a feature-level `compatibility_matrix` for dashboards and compatibility tracking. It is not a capability manifest and should never be stored or labeled as one.
 
 Emit the public adapter execution-plan JSON for the currently selected cases:
 
@@ -101,6 +101,8 @@ cargo run -p nnrp-conformance-runner -- \
 ```
 
 The `adapter-plan` command emits the public adapter execution-plan shape defined by `schemas/adapter-execution-plan.schema.json`. Implementations can consume that JSON without linking to Rust crates or reading runner internals.
+
+The suite does not freeze SDK-local adapter wrapper names, project paths, or command-line shapes. Each SDK repository owns its own adapter entrypoint contract and implementation backlog. `nnrp-conformance` only freezes the language-neutral execution-plan and case-result JSON shapes plus the suite-side selection semantics.
 
 Validate the published JSON artifacts for an explicit baseline against the suite-owned schemas:
 
@@ -172,7 +174,7 @@ L4 performance and steady-state regression checks are explicitly outside the pro
 The repository-wide CI exit policy is therefore:
 
 1. Mandatory failures are blocking.
-2. Optional cases are selected and executed when claimed, but Preview3 bootstrap treats their failures as non-blocking release-note material rather than as protocol-gate failures.
+2. Optional cases are selected and executed when claimed, but Preview3 bootstrap treats their failures as non-blocking compatibility-note material rather than as protocol-gate failures.
 3. Experimental and deprecated cases are always informational.
 4. Not-claimed cases are never treated as failures.
 5. L4 performance coverage is never part of the bootstrap protocol gate.
@@ -191,4 +193,4 @@ When a new preview line is introduced:
 4. Add or update any public schema-backed examples or runner behavior only in ways that remain backward-compatible with already-published baseline directories.
 5. Let CI discover the new line by enumerating `protocol/*/manifest.json`; do not replace or rename the historical baseline directories.
 
-Baseline revisions are tagged independently from SDK releases. The repository convention is to use baseline tags in the form `baseline/<protocol-version>/r<N>` so a protocol baseline revision can advance without pretending it is the same thing as an SDK package or repository release.
+This repository does not maintain a separate release-branch or baseline-tag workflow. Historical compatibility is tracked directly in `main` through append-only `protocol/<protocol-version>/` directories, and CI always validates those explicit baselines against the current runner and schemas.

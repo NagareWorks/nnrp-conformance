@@ -1,6 +1,6 @@
 ## Summary
 
-- PR type: feature / bugfix / docs / maintenance / release
+- PR type: feature / bugfix / docs / maintenance
 - What changed?
 - Why is it needed now?
 
@@ -35,7 +35,7 @@ Commands or workflow runs used:
 
 - [ ] Branch name matches repository conventions
 - [ ] Commit messages follow Conventional Commits
-- [ ] PR is squashed to one commit unless this is necessary `release/<version>` branch work
+- [ ] PR is squashed to one commit
 - [ ] Documentation was updated when public behavior changed
 
 ## Notes

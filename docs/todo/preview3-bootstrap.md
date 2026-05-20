@@ -5,7 +5,7 @@
 - [x] Initialize an isolated GitHub-backed repository.
 - [x] Create the Rust workspace and split it into `fixtures` and `runner` crates.
 - [x] Add GitHub Actions CI for formatting, linting, tests, and baseline summary.
-- [ ] Add branch protection and required status checks on GitHub.
+- [x] Add branch protection and required status checks on GitHub.
 - [x] Publish the first repository README and contribution guidance.
 
 ## Public Manifest Contracts
@@ -42,9 +42,7 @@
 - [x] Define the suite-owned adapter execution-plan JSON contract.
 - [x] Define the suite-owned case-result report JSON contract.
 - [x] Add example adapter input/output payloads that third-party implementations can follow without reading Rust internals.
-- [ ] Define the adapter command contract for `nnrp-rs`.
-- [ ] Define the adapter command contract for `nnrp-py`.
-- [ ] Define the adapter command contract for `nnrp-cs`.
+- [x] Freeze that SDK-local adapter command forms stay owned by each SDK repository and are not part of the suite contract here.
 - [x] Document how third-party implementations consume the baseline without depending on Rust internals.
 
 ## Preview3 Execution Layers
@@ -56,9 +54,9 @@
 - [x] Keep L3 integration smoke outside the mandatory set until L0-L1 semantics stop moving.
 - [x] Keep L4 performance checks out of the protocol pass/fail gate for the first bootstrap.
 
-## Reporting And Release Discipline
+## Reporting And Baseline Discipline
 
 - [x] Emit a stable JSON report file from the runner.
 - [x] Define CI exit rules for `mandatory`, `optional`, `experimental`, and `deprecated` cases.
-- [x] Tag Preview3 baseline revisions independently from SDK release tags.
+- [x] Keep historical protocol baselines append-only in `main` instead of introducing a separate baseline-freeze workflow.
 - [x] Document how a new preview line is added without rewriting historical baselines.
