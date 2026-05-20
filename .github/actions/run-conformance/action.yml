@@ -1,5 +1,5 @@
 name: Run NNRP Conformance
-description: Run a protocol baseline summary and optional vector comparison against an SDK exporter.
+description: Run a protocol baseline summary, optional vector comparison against an SDK exporter, and optional adapter contract validation.
 
 inputs:
   protocol-version:
@@ -15,6 +15,10 @@ inputs:
     default: "."
   sdk-vector-command:
     description: Optional PowerShell command that writes an SDK-produced vector manifest to NNRP_CONFORMANCE_SDK_VECTOR_OUTPUT.
+    required: false
+    default: ""
+  adapter-command:
+    description: Optional PowerShell command that reads NNRP_CONFORMANCE_ADAPTER_PLAN and writes NNRP_CONFORMANCE_ADAPTER_RESULTS.
     required: false
     default: ""
   artifact-name:
@@ -36,6 +40,12 @@ outputs:
   sdk-vector-manifest:
     description: Absolute path to the SDK-produced vector manifest, when generated.
     value: ${{ steps.resolve.outputs.sdk-vector-path }}
+  adapter-plan-path:
+    description: Absolute path to the generated adapter execution plan, when adapter validation is enabled.
+    value: ${{ steps.resolve.outputs.adapter-plan-path }}
+  adapter-results-path:
+    description: Absolute path to the adapter case-results report, when adapter validation is enabled.
+    value: ${{ steps.resolve.outputs.adapter-results-path }}
 
 runs:
   using: composite
@@ -104,6 +114,9 @@ runs:
 
         $reportPath = Join-Path $artifactDir 'conformance-report.json'
         $sdkVectorPath = Join-Path $artifactDir 'sdk-vector-manifest.json'
+        $adapterPlanPath = Join-Path $artifactDir 'adapter-plan.json'
+        $adapterResultsPath = Join-Path $artifactDir 'adapter-results.json'
+        $adapterEvidenceDir = Join-Path $artifactDir 'adapter-evidence'
 
         "suite-root=$suiteRoot" >> $env:GITHUB_OUTPUT
         "protocol-root=$protocolRoot" >> $env:GITHUB_OUTPUT
@@ -114,6 +127,9 @@ runs:
         "artifact-name=$artifactName" >> $env:GITHUB_OUTPUT
         "report-path=$reportPath" >> $env:GITHUB_OUTPUT
         "sdk-vector-path=$sdkVectorPath" >> $env:GITHUB_OUTPUT
+        "adapter-plan-path=$adapterPlanPath" >> $env:GITHUB_OUTPUT
+        "adapter-results-path=$adapterResultsPath" >> $env:GITHUB_OUTPUT
+        "adapter-evidence-dir=$adapterEvidenceDir" >> $env:GITHUB_OUTPUT
 
     - name: Validate public schemas
       shell: pwsh
@@ -198,6 +214,26 @@ runs:
 
         "canonical-path=$canonicalPath" >> $env:GITHUB_OUTPUT
 
+    - name: Generate adapter execution plan
+      if: ${{ inputs.adapter-command != '' }}
+      shell: pwsh
+      run: |
+        if ([string]::IsNullOrWhiteSpace('${{ steps.resolve.outputs.capabilities-path }}')) {
+          throw 'Adapter validation requires a capability manifest so the suite can select public cases.'
+        }
+
+        $runnerManifest = Join-Path '${{ steps.resolve.outputs.suite-root }}' 'Cargo.toml'
+        & cargo run --manifest-path $runnerManifest -p nnrp-conformance-runner -- `
+          adapter-plan `
+          --protocol '${{ steps.resolve.outputs.protocol-manifest }}' `
+          --capabilities '${{ steps.resolve.outputs.capabilities-path }}' `
+          --output '${{ steps.resolve.outputs.adapter-plan-path }}' `
+          --results-path '${{ steps.resolve.outputs.adapter-results-path }}' `
+          --evidence-dir '${{ steps.resolve.outputs.adapter-evidence-dir }}'
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
     - name: Export SDK vector manifest
       if: ${{ inputs.sdk-vector-command != '' }}
       shell: pwsh
@@ -206,6 +242,26 @@ runs:
         SDK_VECTOR_COMMAND: ${{ inputs.sdk-vector-command }}
       run: |
         $command = $env:SDK_VECTOR_COMMAND
+        Push-Location '${{ steps.resolve.outputs.working-directory }}'
+        try {
+          & ([scriptblock]::Create($command))
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+        }
+        finally {
+          Pop-Location
+        }
+
+    - name: Run adapter command
+      if: ${{ inputs.adapter-command != '' }}
+      shell: pwsh
+      env:
+        NNRP_CONFORMANCE_ADAPTER_PLAN: ${{ steps.resolve.outputs.adapter-plan-path }}
+        NNRP_CONFORMANCE_ADAPTER_RESULTS: ${{ steps.resolve.outputs.adapter-results-path }}
+        ADAPTER_COMMAND: ${{ inputs.adapter-command }}
+      run: |
+        $command = $env:ADAPTER_COMMAND
         Push-Location '${{ steps.resolve.outputs.working-directory }}'
         try {
           & ([scriptblock]::Create($command))
@@ -231,6 +287,16 @@ runs:
           exit $LASTEXITCODE
         }
 
+    - name: Validate adapter case results
+      if: ${{ inputs.adapter-command != '' }}
+      shell: pwsh
+      run: |
+        $runnerManifest = Join-Path '${{ steps.resolve.outputs.suite-root }}' 'Cargo.toml'
+        & cargo run --manifest-path $runnerManifest -p nnrp-conformance-runner -- validate-adapter-results --plan '${{ steps.resolve.outputs.adapter-plan-path }}' --results '${{ steps.resolve.outputs.adapter-results-path }}'
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
     - name: Publish conformance summary
       shell: pwsh
       run: |
@@ -249,6 +315,12 @@ runs:
         }
         if (Test-Path '${{ steps.resolve.outputs.sdk-vector-path }}') {
           $lines += "- SDK vector manifest: ${{ steps.resolve.outputs.sdk-vector-path }}"
+        }
+        if (Test-Path '${{ steps.resolve.outputs.adapter-plan-path }}') {
+          $lines += "- Adapter execution plan: ${{ steps.resolve.outputs.adapter-plan-path }}"
+        }
+        if (Test-Path '${{ steps.resolve.outputs.adapter-results-path }}') {
+          $lines += "- Adapter case results: ${{ steps.resolve.outputs.adapter-results-path }}"
         }
         Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ($lines -join [Environment]::NewLine)
 

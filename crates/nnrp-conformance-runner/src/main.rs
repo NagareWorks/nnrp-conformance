@@ -1,15 +1,16 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use nnrp_conformance_fixtures::{
-    AdapterArtifactContext, CapabilityManifest, CaseManifest, ProtocolManifest,
-    SemanticVectorManifest, VectorManifest, build_vector_manifest, load_json_file,
-    verify_vector_manifest,
+    AdapterArtifactContext, AdapterCaseOutcome, AdapterCaseResultReport, AdapterExecutionPlan,
+    CapabilityManifest, CaseManifest, ProtocolManifest, SemanticVectorManifest, VectorManifest,
+    build_vector_manifest, load_json_file, verify_vector_manifest,
 };
 use nnrp_conformance_runner::{
     build_adapter_execution_plan, build_adapter_execution_plan_for_manifests, build_execution_plan,
     build_execution_plan_for_manifests,
 };
-use std::collections::BTreeMap;
+use serde::Serialize;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -65,6 +66,12 @@ enum Command {
         expected: PathBuf,
         #[arg(long)]
         actual: PathBuf,
+    },
+    ValidateAdapterResults {
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        results: PathBuf,
     },
 }
 
@@ -211,6 +218,12 @@ fn main() -> Result<()> {
             let actual_manifest: VectorManifest = load_json_file(&actual)?;
             compare_vector_manifests(&expected_manifest, &actual_manifest)?;
         }
+        Command::ValidateAdapterResults { plan, results } => {
+            let adapter_plan: AdapterExecutionPlan = load_json_file(&plan)?;
+            let adapter_results: AdapterCaseResultReport = load_json_file(&results)?;
+            let summary = validate_adapter_results(&adapter_plan, &adapter_results)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
     }
 
     Ok(())
@@ -263,4 +276,185 @@ fn compare_vector_manifests(expected: &VectorManifest, actual: &VectorManifest) 
     }
 
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct AdapterValidationSummary {
+    selected_cases: usize,
+    pass_cases: usize,
+    fail_cases: usize,
+    skipped_cases: usize,
+    error_cases: usize,
+}
+
+fn validate_adapter_results(
+    expected_plan: &AdapterExecutionPlan,
+    actual_report: &AdapterCaseResultReport,
+) -> Result<AdapterValidationSummary> {
+    anyhow::ensure!(
+        expected_plan.protocol_version == actual_report.protocol_version,
+        "adapter protocol version mismatch: expected {}, got {}",
+        expected_plan.protocol_version,
+        actual_report.protocol_version
+    );
+    anyhow::ensure!(
+        expected_plan.implementation_name == actual_report.implementation_name,
+        "adapter implementation name mismatch: expected {}, got {}",
+        expected_plan.implementation_name,
+        actual_report.implementation_name
+    );
+
+    let expected_ids = expected_plan
+        .cases
+        .iter()
+        .map(|case| case.id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut actual_ids = BTreeSet::new();
+
+    let mut summary = AdapterValidationSummary {
+        selected_cases: expected_ids.len(),
+        pass_cases: 0,
+        fail_cases: 0,
+        skipped_cases: 0,
+        error_cases: 0,
+    };
+
+    for result in &actual_report.results {
+        anyhow::ensure!(
+            expected_ids.contains(result.id.as_str()),
+            "adapter results contain an unexpected case id: {}",
+            result.id
+        );
+        anyhow::ensure!(
+            actual_ids.insert(result.id.as_str()),
+            "adapter results contain a duplicate case id: {}",
+            result.id
+        );
+
+        match result.outcome {
+            AdapterCaseOutcome::Pass => summary.pass_cases += 1,
+            AdapterCaseOutcome::Fail => summary.fail_cases += 1,
+            AdapterCaseOutcome::Skip => summary.skipped_cases += 1,
+            AdapterCaseOutcome::Error => summary.error_cases += 1,
+        }
+    }
+
+    anyhow::ensure!(
+        actual_ids.len() == expected_ids.len(),
+        "adapter results are missing {} selected case(s)",
+        expected_ids.len().saturating_sub(actual_ids.len())
+    );
+
+    Ok(summary)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_adapter_results;
+    use nnrp_conformance_fixtures::{
+        AdapterArtifactContext, AdapterCaseOutcome, AdapterCaseResult, AdapterCaseResultReport,
+        AdapterExecutionCase, AdapterExecutionPlan, CaseLayer, CaseStatus,
+    };
+
+    fn sample_plan() -> AdapterExecutionPlan {
+        AdapterExecutionPlan {
+            schema: None,
+            protocol_version: "nnrp-1-preview3".to_string(),
+            suite_version: "preview3-bootstrap".to_string(),
+            implementation_name: "nnrp-rs".to_string(),
+            artifacts: AdapterArtifactContext {
+                results_path: "artifacts/adapter-results.json".to_string(),
+                evidence_dir: "artifacts/evidence".to_string(),
+            },
+            cases: vec![
+                AdapterExecutionCase {
+                    id: "l1.handshake.basic".to_string(),
+                    layer: CaseLayer::L1,
+                    status: CaseStatus::Mandatory,
+                    feature: "handshake".to_string(),
+                    required_capabilities: vec!["control.client_hello".to_string()],
+                    description: "Basic handshake path".to_string(),
+                },
+                AdapterExecutionCase {
+                    id: "l1.session.open_close".to_string(),
+                    layer: CaseLayer::L1,
+                    status: CaseStatus::Mandatory,
+                    feature: "session_lifecycle".to_string(),
+                    required_capabilities: vec!["control.session_open".to_string()],
+                    description: "Session open close path".to_string(),
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn adapter_results_validate_when_report_matches_selected_cases() {
+        let summary = validate_adapter_results(
+            &sample_plan(),
+            &AdapterCaseResultReport {
+                schema: None,
+                protocol_version: "nnrp-1-preview3".to_string(),
+                implementation_name: "nnrp-rs".to_string(),
+                results: vec![
+                    AdapterCaseResult {
+                        id: "l1.handshake.basic".to_string(),
+                        outcome: AdapterCaseOutcome::Error,
+                        failure_kind: Some("not_implemented".to_string()),
+                        message: None,
+                        evidence_paths: vec![],
+                    },
+                    AdapterCaseResult {
+                        id: "l1.session.open_close".to_string(),
+                        outcome: AdapterCaseOutcome::Skip,
+                        failure_kind: None,
+                        message: Some("not wired yet".to_string()),
+                        evidence_paths: vec![],
+                    },
+                ],
+            },
+        )
+        .expect("adapter results should validate");
+
+        assert_eq!(summary.selected_cases, 2);
+        assert_eq!(summary.error_cases, 1);
+        assert_eq!(summary.skipped_cases, 1);
+    }
+
+    #[test]
+    fn adapter_results_reject_missing_selected_case() {
+        let error = validate_adapter_results(
+            &sample_plan(),
+            &AdapterCaseResultReport {
+                schema: None,
+                protocol_version: "nnrp-1-preview3".to_string(),
+                implementation_name: "nnrp-rs".to_string(),
+                results: vec![AdapterCaseResult {
+                    id: "l1.handshake.basic".to_string(),
+                    outcome: AdapterCaseOutcome::Pass,
+                    failure_kind: None,
+                    message: None,
+                    evidence_paths: vec![],
+                }],
+            },
+        )
+        .expect_err("adapter results should reject missing selected case");
+
+        assert!(error.to_string().contains("missing 1 selected case"));
+    }
+
+    #[test]
+    fn adapter_results_reject_implementation_name_mismatch() {
+        let error = validate_adapter_results(
+            &sample_plan(),
+            &AdapterCaseResultReport {
+                schema: None,
+                protocol_version: "nnrp-1-preview3".to_string(),
+                implementation_name: "nnrp-py".to_string(),
+                results: vec![],
+            },
+        )
+        .expect_err("adapter results should reject mismatched implementation name");
+
+        assert!(error.to_string().contains("implementation name mismatch"));
+    }
 }
