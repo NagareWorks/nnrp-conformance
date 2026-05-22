@@ -43,6 +43,41 @@ def validate_json(schema_path: Path, instance_path: Path) -> None:
     )
 
 
+def validate_capability_tokens(protocol_root: Path, protocol_manifest: dict[str, object], capability_path: Path) -> None:
+    capability_manifest = load_json(capability_path)
+    if not isinstance(capability_manifest, dict):
+        raise SystemExit(f"capability manifest must be a JSON object: {capability_path}")
+
+    allowed_tokens: set[str] = set()
+    for relative_path in protocol_manifest.get("case_manifests", []):
+        case_manifest = load_json(protocol_root / str(relative_path))
+        if not isinstance(case_manifest, dict):
+            raise SystemExit(f"case manifest must be a JSON object: {protocol_root / str(relative_path)}")
+        cases = case_manifest.get("cases", [])
+        if not isinstance(cases, list):
+            raise SystemExit(f"case manifest cases must be an array: {protocol_root / str(relative_path)}")
+        for case in cases:
+            if not isinstance(case, dict):
+                raise SystemExit(f"case manifest contains a non-object case: {protocol_root / str(relative_path)}")
+            required = case.get("required_capabilities", [])
+            if not isinstance(required, list):
+                raise SystemExit(
+                    f"case manifest required_capabilities must be an array: {protocol_root / str(relative_path)}"
+                )
+            allowed_tokens.update(str(token) for token in required)
+
+    supports = capability_manifest.get("supports", [])
+    if not isinstance(supports, list):
+        raise SystemExit(f"capability manifest supports must be an array: {capability_path}")
+
+    unknown_tokens = sorted(str(token) for token in supports if str(token) not in allowed_tokens)
+    if unknown_tokens:
+        raise SystemExit(
+            f"capability manifest {capability_path} declares unknown capability token(s): "
+            + ", ".join(unknown_tokens)
+        )
+
+
 def find_repo_root(start: Path) -> Path:
     for candidate in (start, *start.parents):
         if (candidate / "schemas" / "protocol-manifest.schema.json").exists():
@@ -67,6 +102,7 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
     example_capabilities = protocol_root / "example-capabilities.json"
     if example_capabilities.exists():
         validate_json(schema_root / "capability-manifest.schema.json", example_capabilities)
+        validate_capability_tokens(protocol_root, protocol_manifest, example_capabilities)
 
     for relative_path in protocol_manifest.get("vector_recipe_manifests", []):
         if relative_path:

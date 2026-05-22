@@ -164,6 +164,37 @@ fn build_adapter_execution_plan_from_cases<'a>(
     }
 }
 
+fn validate_declared_capabilities<'a>(
+    capability_manifest: Option<&CapabilityManifest>,
+    cases: impl Iterator<Item = &'a CaseDefinition>,
+) -> Result<(), FixtureError> {
+    let Some(capability_manifest) = capability_manifest else {
+        return Ok(());
+    };
+
+    let allowed_capabilities = cases
+        .flat_map(|case| case.required_capabilities.iter().cloned())
+        .collect::<BTreeSet<_>>();
+    let unknown_capabilities = capability_manifest
+        .supports
+        .iter()
+        .filter(|capability| !allowed_capabilities.contains(*capability))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if unknown_capabilities.is_empty() {
+        return Ok(());
+    }
+
+    Err(FixtureError::Validation {
+        message: format!(
+            "capability manifest {} declares unknown capability token(s): {}",
+            capability_manifest.implementation_name,
+            unknown_capabilities.join(", ")
+        ),
+    })
+}
+
 pub fn build_execution_plan(
     protocol_manifest: &ProtocolManifest,
     case_manifest: &CaseManifest,
@@ -203,6 +234,12 @@ pub fn build_execution_plan_for_manifests<'a>(
             capability_manifest_path,
         )?;
     }
+    validate_declared_capabilities(
+        capability_manifest,
+        case_manifests
+            .iter()
+            .flat_map(|(case_manifest, _)| case_manifest.cases.iter()),
+    )?;
 
     Ok(build_execution_plan_from_cases(
         protocol_manifest,
@@ -255,6 +292,12 @@ pub fn build_adapter_execution_plan_for_manifests<'a>(
             Some(capability_manifest_path),
         )?;
     }
+    validate_declared_capabilities(
+        Some(capability_manifest),
+        case_manifests
+            .iter()
+            .flat_map(|(case_manifest, _)| case_manifest.cases.iter()),
+    )?;
 
     Ok(build_adapter_execution_plan_from_cases(
         protocol_manifest,
@@ -307,7 +350,7 @@ mod tests {
             schema: None,
             implementation_name: "sample".to_string(),
             protocol_version: "nnrp-1-preview3".to_string(),
-            supports: vec!["handshake.basic".to_string()],
+            supports: vec![],
         };
 
         let summary = build_execution_plan(
@@ -322,6 +365,50 @@ mod tests {
         assert_eq!(summary.summary.selected_cases, 0);
         assert_eq!(summary.summary.not_claimed_cases, 1);
         assert_eq!(summary.cases[0].selection, "not_claimed");
+    }
+
+    #[test]
+    fn rejects_unknown_capability_tokens() {
+        let protocol_manifest = ProtocolManifest {
+            schema: None,
+            protocol_version: "nnrp-1-preview3".to_string(),
+            suite_version: "0.1.0".to_string(),
+            status: "draft".to_string(),
+            case_manifests: vec![],
+            vector_recipe_manifests: vec![],
+            vector_manifests: vec![],
+            report_schema: "report.schema.json".to_string(),
+        };
+        let case_manifest = CaseManifest {
+            schema: None,
+            protocol_version: "nnrp-1-preview3".to_string(),
+            manifest_name: "mandatory-core".to_string(),
+            cases: vec![CaseDefinition {
+                id: "l1.flow_update.preview3".to_string(),
+                layer: CaseLayer::L1,
+                status: CaseStatus::Mandatory,
+                feature: "flow_update".to_string(),
+                required_capabilities: vec!["flow_update".to_string()],
+                description: "test".to_string(),
+            }],
+        };
+        let capability_manifest = CapabilityManifest {
+            schema: None,
+            implementation_name: "sample".to_string(),
+            protocol_version: "nnrp-1-preview3".to_string(),
+            supports: vec!["flow_update_typo".to_string()],
+        };
+
+        let error = build_execution_plan_for_manifests(
+            &protocol_manifest,
+            [(&case_manifest, Path::new("cases/mandatory-core.json"))],
+            Some(&capability_manifest),
+            Some(Path::new("example-capabilities.json")),
+        )
+        .expect_err("unknown capability token should be rejected");
+
+        assert!(error.to_string().contains("unknown capability token"));
+        assert!(error.to_string().contains("flow_update_typo"));
     }
 
     #[test]
