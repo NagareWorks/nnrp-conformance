@@ -43,7 +43,11 @@ def validate_json(schema_path: Path, instance_path: Path) -> None:
     )
 
 
-def validate_capability_tokens(protocol_root: Path, protocol_manifest: dict[str, object], capability_path: Path) -> None:
+def validate_capability_tokens(
+    protocol_root: Path,
+    protocol_manifest: dict[str, object],
+    capability_path: Path,
+) -> None:
     capability_manifest = load_json(capability_path)
     if not isinstance(capability_manifest, dict):
         raise SystemExit(f"capability manifest must be a JSON object: {capability_path}")
