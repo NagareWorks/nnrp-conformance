@@ -194,3 +194,7 @@ When a new preview line is introduced:
 5. Let CI discover the new line by enumerating `protocol/*/manifest.json`; do not replace or rename the historical baseline directories.
 
 This repository does not maintain a separate release-branch or baseline-tag workflow. Historical compatibility is tracked directly in `main` through append-only `protocol/<protocol-version>/` directories, and CI always validates those explicit baselines against the current runner and schemas.
+
+## License
+
+This repository is released under the Apache License 2.0. See `LICENSE` for details.

@@ -6,6 +6,8 @@ This repository publishes versioned protocol-conformance baselines and the refer
 
 `main` is the protected integration branch.
 
+This repository intentionally does not use `develop` or long-lived `release/*` branches for normal work. Unlike SDK repositories, it carries historical compatibility through explicit, append-only protocol baseline directories under `protocol/`.
+
 Use short-lived topic branches for day-to-day work:
 
 - `feature/<scope>-<topic>` for new baseline capabilities, runner features, or adapter contracts
