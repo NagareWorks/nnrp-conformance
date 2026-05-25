@@ -50,6 +50,12 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Clear preinstalled pinned Rust toolchain
+      shell: pwsh
+      run: |
+        rustup toolchain uninstall 1.85.0
+        exit 0
+
     - name: Setup Rust toolchain
       uses: dtolnay/rust-toolchain@1.85.0
 

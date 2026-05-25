@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/benchmark-execution-plan.schema.json",
+  "title": "NNRP Benchmark Execution Plan",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "suite_version",
+    "implementation_name",
+    "artifacts",
+    "scenarios"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string"
+    },
+    "suite_version": {
+      "type": "string"
+    },
+    "implementation_name": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "object",
+      "required": [
+        "results_path",
+        "evidence_dir"
+      ],
+      "properties": {
+        "results_path": {
+          "type": "string"
+        },
+        "evidence_dir": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "feature",
+          "required_capabilities",
+          "description",
+          "workload"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "latency",
+              "throughput"
+            ]
+          },
+          "feature": {
+            "type": "string"
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "workload": {
+            "type": "object",
+            "required": [
+              "operation",
+              "payload"
+            ],
+            "properties": {
+              "operation": {
+                "type": "string"
+              },
+              "payload": {
+                "type": "string"
+              },
+              "transport": {
+                "type": "string"
+              },
+              "iterations": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "warmup_iterations": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "duration_seconds": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

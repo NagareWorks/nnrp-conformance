@@ -128,6 +128,14 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
     if adapter_results_example.exists():
         validate_json(schema_root / "adapter-case-results.schema.json", adapter_results_example)
 
+    benchmark_plan_example = docs_examples / "benchmark-execution-plan.sample.json"
+    if benchmark_plan_example.exists():
+        validate_json(schema_root / "benchmark-execution-plan.schema.json", benchmark_plan_example)
+
+    benchmark_results_example = docs_examples / "benchmark-results.sample.json"
+    if benchmark_results_example.exists():
+        validate_json(schema_root / "benchmark-results.schema.json", benchmark_results_example)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
