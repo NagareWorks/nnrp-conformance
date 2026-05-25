@@ -50,6 +50,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Clear preinstalled pinned Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain uninstall 1.85.0
+          exit 0
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.85.0
         with:

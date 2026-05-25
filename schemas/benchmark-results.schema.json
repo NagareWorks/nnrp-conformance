@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/benchmark-results.schema.json",
+  "title": "NNRP Benchmark Results",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "implementation_name",
+    "environment",
+    "results"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string"
+    },
+    "implementation_name": {
+      "type": "string"
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "os",
+        "arch"
+      ],
+      "properties": {
+        "sdk_commit": {
+          "type": "string"
+        },
+        "nnrp_rs_artifact": {
+          "type": "string"
+        },
+        "host_runtime": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "arch": {
+          "type": "string"
+        },
+        "cpu": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "outcome"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "measured",
+              "skip",
+              "error"
+            ]
+          },
+          "samples": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "value",
+                "unit"
+              ],
+              "properties": {
+                "value": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "p50_us": {
+                "type": "number"
+              },
+              "p95_us": {
+                "type": "number"
+              },
+              "p99_us": {
+                "type": "number"
+              },
+              "throughput_ops_per_sec": {
+                "type": "number"
+              },
+              "cpu_percent": {
+                "type": "number"
+              },
+              "peak_memory_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "gc_alloc_bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "message": {
+            "type": "string"
+          },
+          "evidence_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "../../schemas/benchmark-execution-plan.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "suite_version": "0.1.0",
+  "implementation_name": "sample-benchmark-adapter",
+  "artifacts": {
+    "results_path": "artifacts/benchmark-results.json",
+    "evidence_dir": "artifacts/benchmark-evidence"
+  },
+  "scenarios": [
+    {
+      "id": "l4.header.encode_decode.latency",
+      "category": "latency",
+      "feature": "benchmark.header",
+      "required_capabilities": [],
+      "description": "Measure L0 header encode/decode latency for the minimum fixed header shape.",
+      "workload": {
+        "operation": "header_encode_decode",
+        "payload": "l0_header",
+        "iterations": 100000,
+        "warmup_iterations": 10000
+      }
+    },
+    {
+      "id": "l4.metadata.session_open_ack.latency",
+      "category": "latency",
+      "feature": "benchmark.metadata",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Measure SESSION_OPEN plus SESSION_OPEN_ACK metadata encode/decode latency.",
+      "workload": {
+        "operation": "metadata_encode_decode",
+        "payload": "session_open_ack",
+        "iterations": 100000,
+        "warmup_iterations": 10000
+      }
+    },
+    {
+      "id": "l4.submit_result.inline_tensor.throughput",
+      "category": "throughput",
+      "feature": "benchmark.submit_result",
+      "required_capabilities": [
+        "frame_submit.tensor.inline",
+        "result_push.basic"
+      ],
+      "description": "Measure inline tensor submit/result throughput through the SDK runtime path.",
+      "workload": {
+        "operation": "submit_result_loop",
+        "payload": "inline_tensor_4k",
+        "warmup_iterations": 1000,
+        "duration_seconds": 10
+      }
+    }
+  ]
+}

@@ -44,12 +44,13 @@ The current repository state establishes the shared conformance entrypoint descr
 3. Recipe-backed canonical vector manifests can be generated and deterministically verified inside the suite.
 4. SDK repositories integrate through the suite-owned `run-conformance` action plus an SDK exporter command, not by embedding suite conformance into local pytest/xUnit coverage jobs.
 
-The protocol-side design now freezes two different integration surfaces:
+The protocol-side design now freezes three different integration surfaces:
 
 1. The static exporter contract is the formal integration path that exists today: capability manifest, exporter command, and canonical vector comparison.
 2. The adapter execution contract is a separate future-facing surface for dynamic behavior execution. It is reserved at the protocol-design layer, but it is not yet the required CI path in this repository.
+3. The benchmark contract is an informational performance surface. It standardizes scenario selection and result shape without requiring SDK APIs to look identical.
 
-Those two surfaces must remain separate. Static vector comparison proves byte-shape alignment against the canonical baseline, while adapter execution will eventually prove selected state-machine behavior.
+Those surfaces must remain separate. Static vector comparison proves byte-shape alignment against the canonical baseline, adapter execution will eventually prove selected state-machine behavior, and benchmark execution tracks performance deltas without becoming a protocol pass/fail gate.
 
 The suite-owned public JSON files for that future adapter surface now live at:
 
@@ -57,6 +58,13 @@ The suite-owned public JSON files for that future adapter surface now live at:
 2. `schemas/adapter-case-results.schema.json`
 3. `docs/examples/adapter-execution-plan.sample.json`
 4. `docs/examples/adapter-case-results.sample.json`
+
+The suite-owned public JSON files for informational benchmark execution live at:
+
+1. `schemas/benchmark-execution-plan.schema.json`
+2. `schemas/benchmark-results.schema.json`
+3. `docs/examples/benchmark-execution-plan.sample.json`
+4. `docs/examples/benchmark-results.sample.json`
 
 ## Third-Party Implementation Integration
 
@@ -78,6 +86,8 @@ Third-party implementations must not depend on:
 If an implementation wants deeper behavior validation before the adapter execution contract lands here, that validation remains repository-local. The shared contract in this repository is still the language-neutral manifest, vector, report, and action surface.
 
 When adapter execution is enabled in a later phase, implementations should expect the suite to hand them an execution-plan JSON that already contains the selected public cases, and they should return a case-result report JSON that follows the published schemas above.
+
+When benchmark execution is enabled, implementations should expect the suite to hand them a benchmark execution-plan JSON. SDK repositories own their local benchmark runner commands, API calls, and harness internals; this repository owns only the language-neutral scenario and result JSON shapes.
 
 ## Local Commands
 
@@ -115,6 +125,27 @@ The `adapter-plan` command emits the public adapter execution-plan shape defined
 
 The suite does not freeze SDK-local adapter wrapper names, project paths, or command-line shapes. Each SDK repository owns its own adapter entrypoint contract and implementation backlog. `nnrp-conformance` only freezes the language-neutral execution-plan and case-result JSON shapes plus the suite-side selection semantics.
 
+Emit the public benchmark execution-plan JSON for a versioned protocol and capability manifest:
+
+```bash
+cargo run -p nnrp-conformance-runner -- \
+  benchmark-plan \
+  --protocol protocol/nnrp-1-preview3/manifest.json \
+  --capabilities protocol/nnrp-1-preview3/example-capabilities.json \
+  --output artifacts/preview3-benchmark-plan.json
+```
+
+Validate an SDK benchmark result report against the suite-owned plan:
+
+```bash
+cargo run -p nnrp-conformance-runner -- \
+  validate-benchmark-results \
+  --plan artifacts/preview3-benchmark-plan.json \
+  --results artifacts/benchmark-results.json
+```
+
+Benchmark results are informational. They are intended for pre/post migration comparisons and steady-state regression tracking, not for protocol correctness gating.
+
 Validate the published JSON artifacts for an explicit baseline against the suite-owned schemas:
 
 ```bash
@@ -122,7 +153,7 @@ python scripts/validate_public_json.py \
   --protocol protocol/nnrp-1-preview3/manifest.json
 ```
 
-The `validate_public_json.py` script is the first-class schema-validation path used by CI. It validates the selected protocol manifest, every referenced case/vector/recipe manifest, the baseline example capability manifest when present, and the suite-owned adapter example payloads.
+The `validate_public_json.py` script is the first-class schema-validation path used by CI. It validates the selected protocol manifest, every referenced case/vector/recipe manifest, the baseline example capability manifest when present, and the suite-owned adapter and benchmark example payloads.
 
 Generate and verify the canonical vector manifest from a recipe-backed baseline:
 

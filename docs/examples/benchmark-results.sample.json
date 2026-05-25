@@ -1,0 +1,41 @@
+{
+  "$schema": "../../schemas/benchmark-results.schema.json",
+  "protocol_version": "nnrp-1-preview3",
+  "implementation_name": "sample-benchmark-adapter",
+  "environment": {
+    "sdk_commit": "0123456789abcdef",
+    "host_runtime": "sample-runtime 1.0.0",
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu": "sample cpu"
+  },
+  "results": [
+    {
+      "id": "l4.header.encode_decode.latency",
+      "outcome": "measured",
+      "metrics": {
+        "p50_us": 0.8,
+        "p95_us": 1.1,
+        "p99_us": 1.6,
+        "cpu_percent": 82.5,
+        "peak_memory_bytes": 52428800
+      }
+    },
+    {
+      "id": "l4.metadata.session_open_ack.latency",
+      "outcome": "measured",
+      "metrics": {
+        "p50_us": 2.4,
+        "p95_us": 3.1,
+        "p99_us": 4.0,
+        "cpu_percent": 84.2,
+        "peak_memory_bytes": 53477376
+      }
+    },
+    {
+      "id": "l4.submit_result.inline_tensor.throughput",
+      "outcome": "skip",
+      "message": "runtime submit/result loop is not implemented in this sample adapter"
+    }
+  ]
+}

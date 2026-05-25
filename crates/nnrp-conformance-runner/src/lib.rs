@@ -1,8 +1,9 @@
 use nnrp_conformance_fixtures::{
-    AdapterArtifactContext, AdapterExecutionCase, AdapterExecutionPlan, CapabilityManifest,
-    CaseDefinition, CaseManifest, CaseStatus, CompatibilityMatrixEntry, ConformanceReport,
-    FixtureError, ProtocolManifest, ReportCase, ReportStatusSummary, ReportSummary,
-    validate_protocol_alignment,
+    AdapterArtifactContext, AdapterExecutionCase, AdapterExecutionPlan, BenchmarkArtifactContext,
+    BenchmarkCategory, BenchmarkExecutionPlan, BenchmarkScenario, BenchmarkWorkload,
+    CapabilityManifest, CaseDefinition, CaseManifest, CaseStatus, CompatibilityMatrixEntry,
+    ConformanceReport, FixtureError, ProtocolManifest, ReportCase, ReportStatusSummary,
+    ReportSummary, validate_protocol_alignment,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -195,6 +196,126 @@ fn validate_declared_capabilities<'a>(
     })
 }
 
+pub fn build_benchmark_execution_plan(
+    protocol_manifest: &ProtocolManifest,
+    capability_manifest: &CapabilityManifest,
+    artifacts: BenchmarkArtifactContext,
+) -> BenchmarkExecutionPlan {
+    BenchmarkExecutionPlan {
+        schema: Some(
+            "https://github.com/NagareWorks/nnrp-conformance/schemas/benchmark-execution-plan.schema.json"
+                .to_string(),
+        ),
+        protocol_version: protocol_manifest.protocol_version.clone(),
+        suite_version: protocol_manifest.suite_version.clone(),
+        implementation_name: capability_manifest.implementation_name.clone(),
+        artifacts,
+        scenarios: default_benchmark_scenarios(&capability_manifest.supports),
+    }
+}
+
+fn default_benchmark_scenarios(supports: &[String]) -> Vec<BenchmarkScenario> {
+    let declared_capabilities = supports.iter().cloned().collect::<BTreeSet<_>>();
+
+    let mut scenarios = vec![
+        BenchmarkScenario {
+            id: "l4.header.encode_decode.latency".to_string(),
+            category: BenchmarkCategory::Latency,
+            feature: "benchmark.header".to_string(),
+            required_capabilities: vec![],
+            description:
+                "Measure L0 header encode/decode latency for the minimum fixed header shape."
+                    .to_string(),
+            workload: BenchmarkWorkload {
+                operation: "header_encode_decode".to_string(),
+                payload: "l0_header".to_string(),
+                transport: None,
+                iterations: Some(100_000),
+                warmup_iterations: Some(10_000),
+                duration_seconds: None,
+            },
+        },
+        BenchmarkScenario {
+            id: "l4.metadata.session_open_ack.latency".to_string(),
+            category: BenchmarkCategory::Latency,
+            feature: "benchmark.metadata".to_string(),
+            required_capabilities: vec!["session.open_close".to_string()],
+            description:
+                "Measure SESSION_OPEN plus SESSION_OPEN_ACK metadata encode/decode latency."
+                    .to_string(),
+            workload: BenchmarkWorkload {
+                operation: "metadata_encode_decode".to_string(),
+                payload: "session_open_ack".to_string(),
+                transport: None,
+                iterations: Some(100_000),
+                warmup_iterations: Some(10_000),
+                duration_seconds: None,
+            },
+        },
+        BenchmarkScenario {
+            id: "l4.submit_result.inline_tensor.throughput".to_string(),
+            category: BenchmarkCategory::Throughput,
+            feature: "benchmark.submit_result".to_string(),
+            required_capabilities: vec![
+                "frame_submit.tensor.inline".to_string(),
+                "result_push.basic".to_string(),
+            ],
+            description:
+                "Measure inline tensor submit/result throughput through the SDK runtime path."
+                    .to_string(),
+            workload: BenchmarkWorkload {
+                operation: "submit_result_loop".to_string(),
+                payload: "inline_tensor_4k".to_string(),
+                transport: None,
+                iterations: None,
+                warmup_iterations: Some(1_000),
+                duration_seconds: Some(10),
+            },
+        },
+        BenchmarkScenario {
+            id: "l4.transport.tcp.loopback.throughput".to_string(),
+            category: BenchmarkCategory::Throughput,
+            feature: "benchmark.transport.tcp".to_string(),
+            required_capabilities: vec!["transport.tcp".to_string()],
+            description: "Measure request/result throughput over a local TCP loopback transport."
+                .to_string(),
+            workload: BenchmarkWorkload {
+                operation: "transport_loopback".to_string(),
+                payload: "request_result_stream".to_string(),
+                transport: Some("tcp".to_string()),
+                iterations: None,
+                warmup_iterations: Some(1_000),
+                duration_seconds: Some(10),
+            },
+        },
+        BenchmarkScenario {
+            id: "l4.transport.quic.loopback.throughput".to_string(),
+            category: BenchmarkCategory::Throughput,
+            feature: "benchmark.transport.quic".to_string(),
+            required_capabilities: vec!["transport.quic".to_string()],
+            description:
+                "Measure request/result throughput over a local QUIC loopback transport slot."
+                    .to_string(),
+            workload: BenchmarkWorkload {
+                operation: "transport_loopback".to_string(),
+                payload: "request_result_stream".to_string(),
+                transport: Some("quic".to_string()),
+                iterations: None,
+                warmup_iterations: Some(1_000),
+                duration_seconds: Some(10),
+            },
+        },
+    ];
+
+    scenarios.retain(|scenario| {
+        scenario
+            .required_capabilities
+            .iter()
+            .all(|capability| declared_capabilities.contains(capability))
+    });
+    scenarios
+}
+
 pub fn build_execution_plan(
     protocol_manifest: &ProtocolManifest,
     case_manifest: &CaseManifest,
@@ -313,11 +434,11 @@ pub fn build_adapter_execution_plan_for_manifests<'a>(
 mod tests {
     use super::{
         build_adapter_execution_plan, build_adapter_execution_plan_for_manifests,
-        build_execution_plan, build_execution_plan_for_manifests,
+        build_benchmark_execution_plan, build_execution_plan, build_execution_plan_for_manifests,
     };
     use nnrp_conformance_fixtures::{
-        AdapterArtifactContext, CapabilityManifest, CaseDefinition, CaseLayer, CaseManifest,
-        CaseStatus, ProtocolManifest, load_json_file,
+        AdapterArtifactContext, BenchmarkArtifactContext, CapabilityManifest, CaseDefinition,
+        CaseLayer, CaseManifest, CaseStatus, ProtocolManifest, load_json_file,
     };
     use std::path::{Path, PathBuf};
 
@@ -777,5 +898,59 @@ mod tests {
             .cases
             .iter()
             .any(|case| case.id == "l2.result_push.basic.event_pump.single_terminal.validation"));
+    }
+
+    #[test]
+    fn benchmark_plan_includes_optional_transport_slots_only_when_claimed() {
+        let protocol_manifest = ProtocolManifest {
+            schema: None,
+            protocol_version: "nnrp-1-preview3".to_string(),
+            suite_version: "0.1.0".to_string(),
+            status: "draft".to_string(),
+            case_manifests: vec![],
+            vector_recipe_manifests: vec![],
+            vector_manifests: vec![],
+            report_schema: "report.schema.json".to_string(),
+        };
+        let capability_manifest = CapabilityManifest {
+            schema: None,
+            implementation_name: "sample".to_string(),
+            protocol_version: "nnrp-1-preview3".to_string(),
+            supports: vec!["transport.tcp".to_string()],
+        };
+
+        let plan = build_benchmark_execution_plan(
+            &protocol_manifest,
+            &capability_manifest,
+            BenchmarkArtifactContext {
+                results_path: "artifacts/benchmark-results.json".to_string(),
+                evidence_dir: "artifacts/benchmark-evidence".to_string(),
+            },
+        );
+
+        assert_eq!(plan.implementation_name, "sample");
+        assert!(
+            plan.scenarios
+                .iter()
+                .any(|scenario| scenario.id == "l4.transport.tcp.loopback.throughput")
+        );
+        assert!(
+            !plan
+                .scenarios
+                .iter()
+                .any(|scenario| scenario.id == "l4.metadata.session_open_ack.latency")
+        );
+        assert!(
+            !plan
+                .scenarios
+                .iter()
+                .any(|scenario| scenario.id == "l4.submit_result.inline_tensor.throughput")
+        );
+        assert!(
+            !plan
+                .scenarios
+                .iter()
+                .any(|scenario| scenario.id == "l4.transport.quic.loopback.throughput")
+        );
     }
 }

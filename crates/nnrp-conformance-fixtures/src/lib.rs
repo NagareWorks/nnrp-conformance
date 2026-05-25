@@ -104,6 +104,126 @@ pub struct AdapterCaseResultReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkExecutionPlan {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub suite_version: String,
+    pub implementation_name: String,
+    pub artifacts: BenchmarkArtifactContext,
+    pub scenarios: Vec<BenchmarkScenario>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkArtifactContext {
+    pub results_path: String,
+    pub evidence_dir: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkScenario {
+    pub id: String,
+    pub category: BenchmarkCategory,
+    pub feature: String,
+    pub required_capabilities: Vec<String>,
+    pub description: String,
+    pub workload: BenchmarkWorkload,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BenchmarkCategory {
+    Latency,
+    Throughput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkWorkload {
+    pub operation: String,
+    pub payload: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transport: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub iterations: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warmup_iterations: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_seconds: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BenchmarkResultReport {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub implementation_name: String,
+    pub environment: BenchmarkEnvironment,
+    pub results: Vec<BenchmarkScenarioResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkEnvironment {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sdk_commit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nnrp_rs_artifact: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host_runtime: Option<String>,
+    pub os: String,
+    pub arch: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BenchmarkScenarioResult {
+    pub id: String,
+    pub outcome: BenchmarkOutcome,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub samples: Vec<BenchmarkSample>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<BenchmarkMetrics>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_paths: Vec<String>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BenchmarkOutcome {
+    Measured,
+    Skip,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BenchmarkSample {
+    pub value: f64,
+    pub unit: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BenchmarkMetrics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub p50_us: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub p95_us: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub p99_us: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub throughput_ops_per_sec: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_percent: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_memory_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gc_alloc_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdapterCaseResult {
     pub id: String,
     pub outcome: AdapterCaseOutcome,
@@ -249,9 +369,10 @@ pub fn validate_protocol_alignment(
 #[cfg(test)]
 mod tests {
     use super::{
-        AdapterCaseResultReport, AdapterExecutionPlan, CapabilityManifest, CaseManifest,
-        CaseStatus, ProtocolManifest, SemanticVectorManifest, VectorManifest,
-        build_vector_manifest, load_json_file, validate_protocol_alignment, verify_vector_manifest,
+        AdapterCaseResultReport, AdapterExecutionPlan, BenchmarkExecutionPlan,
+        BenchmarkResultReport, CapabilityManifest, CaseManifest, CaseStatus, ProtocolManifest,
+        SemanticVectorManifest, VectorManifest, build_vector_manifest, load_json_file,
+        validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -402,6 +523,43 @@ mod tests {
         assert_eq!(report.protocol_version, "nnrp-1-preview3");
         assert_eq!(report.results.len(), 2);
         assert_eq!(report.results[1].outcome, super::AdapterCaseOutcome::Fail);
+    }
+
+    #[test]
+    fn loads_benchmark_execution_plan_example() {
+        let plan: BenchmarkExecutionPlan = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("benchmark-execution-plan.sample.json"),
+        )
+        .expect("benchmark execution plan example should load");
+
+        assert_eq!(plan.protocol_version, "nnrp-1-preview3");
+        assert_eq!(plan.scenarios.len(), 3);
+        assert_eq!(
+            plan.artifacts.results_path,
+            "artifacts/benchmark-results.json"
+        );
+    }
+
+    #[test]
+    fn loads_benchmark_results_example() {
+        let report: BenchmarkResultReport = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("benchmark-results.sample.json"),
+        )
+        .expect("benchmark results example should load");
+
+        assert_eq!(report.protocol_version, "nnrp-1-preview3");
+        assert_eq!(report.results.len(), 3);
+        assert_eq!(report.environment.os, "linux");
     }
 
     #[test]
