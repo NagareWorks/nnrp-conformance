@@ -33,9 +33,71 @@
       }
     },
     {
+      "id": "l4.metadata.submit_result.latency",
+      "outcome": "measured",
+      "metrics": {
+        "p50_us": 1.9,
+        "p95_us": 2.6,
+        "p99_us": 3.4,
+        "cpu_percent": 83.8,
+        "peak_memory_bytes": 53477376
+      }
+    },
+    {
+      "id": "l4.typed_payload.tensor_pack_unpack.latency",
+      "outcome": "measured",
+      "metrics": {
+        "p50_us": 4.8,
+        "p95_us": 6.2,
+        "p99_us": 8.7,
+        "cpu_percent": 85.0,
+        "peak_memory_bytes": 54525952
+      }
+    },
+    {
+      "id": "l4.runtime.probe.latency",
+      "outcome": "measured",
+      "metrics": {
+        "p50_us": 0.5,
+        "p95_us": 0.7,
+        "p99_us": 1.0,
+        "cpu_percent": 81.1,
+        "peak_memory_bytes": 52428800
+      }
+    },
+    {
+      "id": "l4.session.lifecycle.latency",
+      "outcome": "measured",
+      "metrics": {
+        "p50_us": 3.2,
+        "p95_us": 4.1,
+        "p99_us": 5.3,
+        "cpu_percent": 84.4,
+        "peak_memory_bytes": 53477376
+      }
+    },
+    {
       "id": "l4.submit_result.inline_tensor.throughput",
+      "outcome": "measured",
+      "metrics": {
+        "throughput_ops_per_sec": 125000.0,
+        "cpu_percent": 88.0,
+        "peak_memory_bytes": 56623104
+      }
+    },
+    {
+      "id": "l4.transport.tcp.loopback.throughput",
+      "outcome": "measured",
+      "metrics": {
+        "throughput_ops_per_sec": 98000.0,
+        "cpu_percent": 86.5,
+        "peak_memory_bytes": 57671680
+      }
+    },
+    {
+      "id": "l4.transport.quic.loopback.throughput",
       "outcome": "skip",
-      "message": "runtime submit/result loop is not implemented in this sample adapter"
+      "message": "QUIC transport slot is optional and not enabled in this sample adapter"
     }
   ]
 }

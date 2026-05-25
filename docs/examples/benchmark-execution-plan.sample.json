@@ -37,6 +37,65 @@
       }
     },
     {
+      "id": "l4.metadata.submit_result.latency",
+      "category": "latency",
+      "feature": "benchmark.metadata.submit_result",
+      "required_capabilities": [
+        "frame_submit.tensor.inline",
+        "result_push.basic"
+      ],
+      "description": "Measure FRAME_SUBMIT plus RESULT_PUSH metadata encode/decode latency.",
+      "workload": {
+        "operation": "submit_result_metadata_encode_decode",
+        "payload": "frame_submit_result_push",
+        "iterations": 100000,
+        "warmup_iterations": 10000
+      }
+    },
+    {
+      "id": "l4.typed_payload.tensor_pack_unpack.latency",
+      "category": "latency",
+      "feature": "benchmark.typed_payload.tensor",
+      "required_capabilities": [
+        "frame_submit.tensor.inline"
+      ],
+      "description": "Measure tensor descriptor, tile index, and payload pack/unpack latency.",
+      "workload": {
+        "operation": "typed_payload_pack_unpack",
+        "payload": "tensor_descriptor_plus_payload",
+        "iterations": 100000,
+        "warmup_iterations": 10000
+      }
+    },
+    {
+      "id": "l4.runtime.probe.latency",
+      "category": "latency",
+      "feature": "benchmark.runtime_probe",
+      "required_capabilities": [],
+      "description": "Measure SDK runtime version and capability probe latency.",
+      "workload": {
+        "operation": "runtime_probe",
+        "payload": "version_capability_query",
+        "iterations": 100000,
+        "warmup_iterations": 10000
+      }
+    },
+    {
+      "id": "l4.session.lifecycle.latency",
+      "category": "latency",
+      "feature": "benchmark.session_lifecycle",
+      "required_capabilities": [
+        "session.open_close"
+      ],
+      "description": "Measure SDK-local session open plus close lifecycle latency.",
+      "workload": {
+        "operation": "session_lifecycle",
+        "payload": "open_close_loop",
+        "iterations": 100000,
+        "warmup_iterations": 10000
+      }
+    },
+    {
       "id": "l4.submit_result.inline_tensor.throughput",
       "category": "throughput",
       "feature": "benchmark.submit_result",
@@ -48,6 +107,38 @@
       "workload": {
         "operation": "submit_result_loop",
         "payload": "inline_tensor_4k",
+        "warmup_iterations": 1000,
+        "duration_seconds": 10
+      }
+    },
+    {
+      "id": "l4.transport.tcp.loopback.throughput",
+      "category": "throughput",
+      "feature": "benchmark.transport.tcp",
+      "required_capabilities": [
+        "transport.tcp"
+      ],
+      "description": "Measure request/result throughput over a local TCP loopback transport.",
+      "workload": {
+        "operation": "transport_loopback",
+        "payload": "request_result_stream",
+        "transport": "tcp",
+        "warmup_iterations": 1000,
+        "duration_seconds": 10
+      }
+    },
+    {
+      "id": "l4.transport.quic.loopback.throughput",
+      "category": "throughput",
+      "feature": "benchmark.transport.quic",
+      "required_capabilities": [
+        "transport.quic"
+      ],
+      "description": "Measure request/result throughput over a local QUIC loopback transport slot.",
+      "workload": {
+        "operation": "transport_loopback",
+        "payload": "request_result_stream",
+        "transport": "quic",
         "warmup_iterations": 1000,
         "duration_seconds": 10
       }

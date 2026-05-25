@@ -538,7 +538,7 @@ mod tests {
         .expect("benchmark execution plan example should load");
 
         assert_eq!(plan.protocol_version, "nnrp-1-preview3");
-        assert_eq!(plan.scenarios.len(), 3);
+        assert_eq!(plan.scenarios.len(), 9);
         assert_eq!(
             plan.artifacts.results_path,
             "artifacts/benchmark-results.json"
@@ -558,7 +558,7 @@ mod tests {
         .expect("benchmark results example should load");
 
         assert_eq!(report.protocol_version, "nnrp-1-preview3");
-        assert_eq!(report.results.len(), 3);
+        assert_eq!(report.results.len(), 9);
         assert_eq!(report.environment.os, "linux");
     }
 
