@@ -1,5 +1,5 @@
 name: Run NNRP Conformance
-description: Run a protocol baseline summary, optional vector comparison against an SDK exporter, and optional adapter contract validation.
+description: Run a protocol baseline summary, canonical vector validation, and optional adapter contract validation.
 
 inputs:
   protocol-version:
@@ -10,13 +10,9 @@ inputs:
     required: false
     default: ""
   working-directory:
-    description: Repository directory where the optional SDK vector command should run.
+    description: Repository directory where the optional adapter command should run.
     required: false
     default: "."
-  sdk-vector-command:
-    description: Optional PowerShell command that writes an SDK-produced vector manifest to NNRP_CONFORMANCE_SDK_VECTOR_OUTPUT.
-    required: false
-    default: ""
   adapter-command:
     description: Optional PowerShell command that reads NNRP_CONFORMANCE_ADAPTER_PLAN and writes NNRP_CONFORMANCE_ADAPTER_RESULTS.
     required: false
@@ -37,9 +33,6 @@ outputs:
   canonical-vector-manifest:
     description: Absolute path to the canonical vector manifest used for comparison, when available.
     value: ${{ steps.canonical.outputs.canonical-path }}
-  sdk-vector-manifest:
-    description: Absolute path to the SDK-produced vector manifest, when generated.
-    value: ${{ steps.resolve.outputs.sdk-vector-path }}
   adapter-plan-path:
     description: Absolute path to the generated adapter execution plan, when adapter validation is enabled.
     value: ${{ steps.resolve.outputs.adapter-plan-path }}
@@ -119,7 +112,6 @@ runs:
         New-Item -ItemType Directory -Path $artifactDir | Out-Null
 
         $reportPath = Join-Path $artifactDir 'conformance-report.json'
-        $sdkVectorPath = Join-Path $artifactDir 'sdk-vector-manifest.json'
         $adapterPlanPath = Join-Path $artifactDir 'adapter-plan.json'
         $adapterResultsPath = Join-Path $artifactDir 'adapter-results.json'
         $adapterEvidenceDir = Join-Path $artifactDir 'adapter-evidence'
@@ -132,7 +124,6 @@ runs:
         "artifact-dir=$artifactDir" >> $env:GITHUB_OUTPUT
         "artifact-name=$artifactName" >> $env:GITHUB_OUTPUT
         "report-path=$reportPath" >> $env:GITHUB_OUTPUT
-        "sdk-vector-path=$sdkVectorPath" >> $env:GITHUB_OUTPUT
         "adapter-plan-path=$adapterPlanPath" >> $env:GITHUB_OUTPUT
         "adapter-results-path=$adapterResultsPath" >> $env:GITHUB_OUTPUT
         "adapter-evidence-dir=$adapterEvidenceDir" >> $env:GITHUB_OUTPUT
@@ -196,25 +187,16 @@ runs:
     - name: Select canonical vector manifest
       id: canonical
       shell: pwsh
-      env:
-        SDK_VECTOR_COMMAND: ${{ inputs.sdk-vector-command }}
       run: |
         $manifest = Get-Content -Raw '${{ steps.resolve.outputs.protocol-manifest }}' | ConvertFrom-Json
         $recipeManifests = @($manifest.vector_recipe_manifests | Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace([string]$_) })
         $vectorManifests = @($manifest.vector_manifests | Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace([string]$_) })
-        $hasSdkVectorCommand = -not [string]::IsNullOrWhiteSpace($env:SDK_VECTOR_COMMAND)
         $canonicalPath = ''
 
         if ($recipeManifests.Count -gt 0) {
-          if ($hasSdkVectorCommand -and $recipeManifests.Count -ne 1) {
-            throw 'SDK vector comparison requires exactly one vector recipe manifest in the protocol baseline.'
-          }
           $canonicalPath = Join-Path '${{ steps.resolve.outputs.artifact-dir }}' (([System.IO.Path]::GetFileNameWithoutExtension([string]$recipeManifests[0])) + '.generated.json')
         }
         elseif ($vectorManifests.Count -gt 0) {
-          if ($hasSdkVectorCommand -and $vectorManifests.Count -ne 1) {
-            throw 'SDK vector comparison requires exactly one vector manifest in the protocol baseline.'
-          }
           $canonicalPath = Join-Path '${{ steps.resolve.outputs.protocol-root }}' ([string]$vectorManifests[0])
         }
 
@@ -240,25 +222,6 @@ runs:
           exit $LASTEXITCODE
         }
 
-    - name: Export SDK vector manifest
-      if: ${{ inputs.sdk-vector-command != '' }}
-      shell: pwsh
-      env:
-        NNRP_CONFORMANCE_SDK_VECTOR_OUTPUT: ${{ steps.resolve.outputs.sdk-vector-path }}
-        SDK_VECTOR_COMMAND: ${{ inputs.sdk-vector-command }}
-      run: |
-        $command = $env:SDK_VECTOR_COMMAND
-        Push-Location '${{ steps.resolve.outputs.working-directory }}'
-        try {
-          & ([scriptblock]::Create($command))
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-        }
-        finally {
-          Pop-Location
-        }
-
     - name: Run adapter command
       if: ${{ inputs.adapter-command != '' }}
       shell: pwsh
@@ -277,20 +240,6 @@ runs:
         }
         finally {
           Pop-Location
-        }
-
-    - name: Compare SDK vectors against canonical manifest
-      if: ${{ inputs.sdk-vector-command != '' }}
-      shell: pwsh
-      run: |
-        if ([string]::IsNullOrWhiteSpace('${{ steps.canonical.outputs.canonical-path }}')) {
-          throw 'The selected protocol baseline does not expose a single canonical vector manifest for SDK comparison.'
-        }
-
-        $runnerManifest = Join-Path '${{ steps.resolve.outputs.suite-root }}' 'Cargo.toml'
-        & cargo run --manifest-path $runnerManifest -p nnrp-conformance-runner -- compare-vector-manifests --expected '${{ steps.canonical.outputs.canonical-path }}' --actual '${{ steps.resolve.outputs.sdk-vector-path }}'
-        if ($LASTEXITCODE -ne 0) {
-          exit $LASTEXITCODE
         }
 
     - name: Validate adapter case results
@@ -318,9 +267,6 @@ runs:
         )
         if (-not [string]::IsNullOrWhiteSpace('${{ steps.canonical.outputs.canonical-path }}')) {
           $lines += "- Canonical vector manifest: ${{ steps.canonical.outputs.canonical-path }}"
-        }
-        if (Test-Path '${{ steps.resolve.outputs.sdk-vector-path }}') {
-          $lines += "- SDK vector manifest: ${{ steps.resolve.outputs.sdk-vector-path }}"
         }
         if (Test-Path '${{ steps.resolve.outputs.adapter-plan-path }}') {
           $lines += "- Adapter execution plan: ${{ steps.resolve.outputs.adapter-plan-path }}"

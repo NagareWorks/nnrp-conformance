@@ -13,8 +13,9 @@
     "cases/l1-schema-cache.json",
     "cases/l2-binding-driver.json"
   ],
-  "vector_manifests": [
-    "vectors/golden-vectors.json"
+  "vector_recipe_manifests": [
+    "vectors/semantic-vectors.json"
   ],
+  "vector_manifests": [],
   "report_schema": "../../schemas/report.schema.json"
 }

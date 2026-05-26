@@ -112,6 +112,91 @@ pub enum SemanticVectorRecipe {
         credit_epoch: u32,
         flow_update_flags: Vec<FlowUpdateFlagName>,
     },
+    SessionOpenMetadata {
+        name: String,
+        description: String,
+        requested_session_id: u32,
+        profile_id: u16,
+        priority_class: SessionPriorityClassName,
+        session_flags: u8,
+        schema_id: u32,
+        schema_version: u32,
+        default_deadline_ms: u32,
+        max_in_flight_operations: u16,
+        lease_ttl_hint_ms: u32,
+        resume_token_bytes: u32,
+        auth_bytes: u32,
+        session_extension_bytes: u32,
+        client_session_tag: u64,
+    },
+    SessionOpenAckMetadata {
+        name: String,
+        description: String,
+        session_id: u32,
+        accepted_profile_id: u16,
+        accepted_priority_class: SessionPriorityClassName,
+        session_status: SessionStatusName,
+        schema_id: u32,
+        schema_version: u32,
+        granted_operation_credit: u16,
+        max_in_flight_operations: u16,
+        lease_ttl_ms: u32,
+        resume_window_ms: u32,
+        resume_token_bytes: u32,
+        session_extension_bytes: u32,
+        server_session_tag: u64,
+        route_scope_id: u32,
+        session_error_code: u32,
+        session_flags_ack: u32,
+    },
+    SessionCloseMetadata {
+        name: String,
+        description: String,
+        close_reason: SessionCloseReasonName,
+        in_flight_policy: InFlightPolicyName,
+        drain_timeout_ms: u32,
+        last_operation_id: u64,
+        session_error_code: u32,
+        session_close_tag: u32,
+    },
+    SessionCloseAckMetadata {
+        name: String,
+        description: String,
+        close_status: SessionCloseStatusName,
+        last_operation_id: u64,
+        session_error_code: u32,
+    },
+    SchemaDescriptorHeader {
+        name: String,
+        description: String,
+        schema_id: u32,
+        schema_version: u32,
+        profile_id: u16,
+        schema_flags: u16,
+        min_version_major: u8,
+        max_version_major: u8,
+        body_bytes: u32,
+        dependency_count: u16,
+        default_stream_semantics: u16,
+        schema_hash: u64,
+    },
+    U32Value {
+        name: String,
+        description: String,
+        kind: String,
+        value: u32,
+    },
+    TypedPayloadDescriptorV3 {
+        name: String,
+        description: String,
+        profile_id: u16,
+        descriptor_flags: u16,
+        schema_id: u32,
+        schema_version: u32,
+        stream_semantics: u16,
+        offset: u32,
+        length: u32,
+    },
     ResultHintPacket {
         name: String,
         description: String,
@@ -322,6 +407,50 @@ pub enum FlowUpdateFlagName {
     RetryAfterValid,
     BackgroundOnly,
     DrainInFlightOnly,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionPriorityClassName {
+    Interactive,
+    Balanced,
+    Background,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionStatusName {
+    Opened,
+    Rejected,
+    RetryLater,
+    Resumed,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionCloseReasonName {
+    Normal,
+    ClientShutdown,
+    ServerShutdown,
+    IdleTimeout,
+    ProtocolError,
+    AuthRevoked,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InFlightPolicyName {
+    Drain,
+    Abort,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionCloseStatusName {
+    Acknowledged,
+    Draining,
+    Closed,
+    Rejected,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -662,9 +791,207 @@ fn render_recipe(
             );
             Ok((
                 name.clone(),
-                "packet".to_string(),
+                "flow_update_packet".to_string(),
                 description.clone(),
                 packet,
+            ))
+        }
+        SemanticVectorRecipe::SessionOpenMetadata {
+            name,
+            description,
+            requested_session_id,
+            profile_id,
+            priority_class,
+            session_flags,
+            schema_id,
+            schema_version,
+            default_deadline_ms,
+            max_in_flight_operations,
+            lease_ttl_hint_ms,
+            resume_token_bytes,
+            auth_bytes,
+            session_extension_bytes,
+            client_session_tag,
+        } => {
+            let mut payload = Vec::new();
+            push_u32(&mut payload, *requested_session_id);
+            push_u16(&mut payload, *profile_id);
+            push_u8(&mut payload, priority_class.as_u8());
+            push_u8(&mut payload, *session_flags);
+            push_u32(&mut payload, *schema_id);
+            push_u32(&mut payload, *schema_version);
+            push_u32(&mut payload, *default_deadline_ms);
+            push_u16(&mut payload, *max_in_flight_operations);
+            push_u16(&mut payload, 0);
+            push_u32(&mut payload, *lease_ttl_hint_ms);
+            push_u32(&mut payload, *resume_token_bytes);
+            push_u32(&mut payload, *auth_bytes);
+            push_u32(&mut payload, *session_extension_bytes);
+            push_u64(&mut payload, *client_session_tag);
+            Ok((
+                name.clone(),
+                "session_open_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::SessionOpenAckMetadata {
+            name,
+            description,
+            session_id,
+            accepted_profile_id,
+            accepted_priority_class,
+            session_status,
+            schema_id,
+            schema_version,
+            granted_operation_credit,
+            max_in_flight_operations,
+            lease_ttl_ms,
+            resume_window_ms,
+            resume_token_bytes,
+            session_extension_bytes,
+            server_session_tag,
+            route_scope_id,
+            session_error_code,
+            session_flags_ack,
+        } => {
+            let mut payload = Vec::new();
+            push_u32(&mut payload, *session_id);
+            push_u16(&mut payload, *accepted_profile_id);
+            push_u8(&mut payload, accepted_priority_class.as_u8());
+            push_u8(&mut payload, session_status.as_u8());
+            push_u32(&mut payload, *schema_id);
+            push_u32(&mut payload, *schema_version);
+            push_u16(&mut payload, *granted_operation_credit);
+            push_u16(&mut payload, *max_in_flight_operations);
+            push_u32(&mut payload, *lease_ttl_ms);
+            push_u32(&mut payload, *resume_window_ms);
+            push_u32(&mut payload, *resume_token_bytes);
+            push_u32(&mut payload, *session_extension_bytes);
+            push_u64(&mut payload, *server_session_tag);
+            push_u32(&mut payload, *route_scope_id);
+            push_u32(&mut payload, *session_error_code);
+            push_u32(&mut payload, *session_flags_ack);
+            Ok((
+                name.clone(),
+                "session_open_ack_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::SessionCloseMetadata {
+            name,
+            description,
+            close_reason,
+            in_flight_policy,
+            drain_timeout_ms,
+            last_operation_id,
+            session_error_code,
+            session_close_tag,
+        } => {
+            let mut payload = Vec::new();
+            push_u16(&mut payload, close_reason.as_u16());
+            push_u8(&mut payload, in_flight_policy.as_u8());
+            push_u8(&mut payload, 0);
+            push_u32(&mut payload, *drain_timeout_ms);
+            push_u64(&mut payload, *last_operation_id);
+            push_u32(&mut payload, *session_error_code);
+            push_u32(&mut payload, *session_close_tag);
+            Ok((
+                name.clone(),
+                "session_close_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::SessionCloseAckMetadata {
+            name,
+            description,
+            close_status,
+            last_operation_id,
+            session_error_code,
+        } => {
+            let mut payload = Vec::new();
+            push_u8(&mut payload, close_status.as_u8());
+            push_u8(&mut payload, 0);
+            push_u16(&mut payload, 0);
+            push_u64(&mut payload, *last_operation_id);
+            push_u32(&mut payload, *session_error_code);
+            Ok((
+                name.clone(),
+                "session_close_ack_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::SchemaDescriptorHeader {
+            name,
+            description,
+            schema_id,
+            schema_version,
+            profile_id,
+            schema_flags,
+            min_version_major,
+            max_version_major,
+            body_bytes,
+            dependency_count,
+            default_stream_semantics,
+            schema_hash,
+        } => {
+            let mut payload = Vec::new();
+            push_u32(&mut payload, *schema_id);
+            push_u32(&mut payload, *schema_version);
+            push_u16(&mut payload, *profile_id);
+            push_u16(&mut payload, *schema_flags);
+            push_u8(&mut payload, *min_version_major);
+            push_u8(&mut payload, *max_version_major);
+            push_u16(&mut payload, 0);
+            push_u32(&mut payload, *body_bytes);
+            push_u16(&mut payload, *dependency_count);
+            push_u16(&mut payload, *default_stream_semantics);
+            push_u64(&mut payload, *schema_hash);
+            Ok((
+                name.clone(),
+                "schema_descriptor_header".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::U32Value {
+            name,
+            description,
+            kind,
+            value,
+        } => {
+            let mut payload = Vec::new();
+            push_u32(&mut payload, *value);
+            Ok((name.clone(), kind.clone(), description.clone(), payload))
+        }
+        SemanticVectorRecipe::TypedPayloadDescriptorV3 {
+            name,
+            description,
+            profile_id,
+            descriptor_flags,
+            schema_id,
+            schema_version,
+            stream_semantics,
+            offset,
+            length,
+        } => {
+            let mut payload = Vec::new();
+            push_u16(&mut payload, *profile_id);
+            push_u16(&mut payload, *descriptor_flags);
+            push_u32(&mut payload, *schema_id);
+            push_u32(&mut payload, *schema_version);
+            push_u16(&mut payload, *stream_semantics);
+            push_u16(&mut payload, 0);
+            push_u32(&mut payload, *offset);
+            push_u32(&mut payload, *length);
+            Ok((
+                name.clone(),
+                "typed_payload_descriptor".to_string(),
+                description.clone(),
+                payload,
             ))
         }
         SemanticVectorRecipe::ResultHintPacket {
@@ -1181,6 +1508,60 @@ impl FlowUpdateFlagName {
             Self::RetryAfterValid => 0x0000_0002,
             Self::BackgroundOnly => 0x0000_0004,
             Self::DrainInFlightOnly => 0x0000_0008,
+        }
+    }
+}
+
+impl SessionPriorityClassName {
+    fn as_u8(self) -> u8 {
+        match self {
+            Self::Interactive => 0,
+            Self::Balanced => 1,
+            Self::Background => 2,
+        }
+    }
+}
+
+impl SessionStatusName {
+    fn as_u8(self) -> u8 {
+        match self {
+            Self::Opened => 0,
+            Self::Rejected => 1,
+            Self::RetryLater => 2,
+            Self::Resumed => 3,
+        }
+    }
+}
+
+impl SessionCloseReasonName {
+    fn as_u16(self) -> u16 {
+        match self {
+            Self::Normal => 0,
+            Self::ClientShutdown => 1,
+            Self::ServerShutdown => 2,
+            Self::IdleTimeout => 3,
+            Self::ProtocolError => 4,
+            Self::AuthRevoked => 5,
+        }
+    }
+}
+
+impl InFlightPolicyName {
+    fn as_u8(self) -> u8 {
+        match self {
+            Self::Drain => 0,
+            Self::Abort => 1,
+        }
+    }
+}
+
+impl SessionCloseStatusName {
+    fn as_u8(self) -> u8 {
+        match self {
+            Self::Acknowledged => 0,
+            Self::Draining => 1,
+            Self::Closed => 2,
+            Self::Rejected => 3,
         }
     }
 }

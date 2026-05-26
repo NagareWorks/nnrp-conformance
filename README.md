@@ -21,7 +21,7 @@ This repository owns:
 
 1. Versioned protocol baselines such as `protocol/nnrp-1-preview2` and `protocol/nnrp-1-preview3`.
 2. Public machine-readable manifests for cases, capabilities, and reports.
-3. A Rust reference runner that loads a selected baseline, summarizes capability coverage, generates canonical vector manifests, verifies recipe determinism, and compares SDK-exported manifests against canonical output.
+3. A Rust reference runner that loads a selected baseline, summarizes capability coverage, generates canonical vector manifests, verifies recipe determinism, creates adapter and benchmark plans, and validates returned results.
 4. A suite-owned GitHub composite action that executes the canonical conformance flow for SDK repositories.
 5. CI checks that keep the repository itself buildable and the published baselines internally consistent.
 
@@ -42,15 +42,15 @@ The current repository state establishes the shared conformance entrypoint descr
 1. Multiple versioned protocol baselines can coexist under `protocol/`.
 2. Capability manifests decide which `mandatory` and `optional` cases are actually selected for a given implementation.
 3. Recipe-backed canonical vector manifests can be generated and deterministically verified inside the suite.
-4. SDK repositories integrate through the suite-owned `run-conformance` action plus an SDK exporter command, not by embedding suite conformance into local pytest/xUnit coverage jobs.
+4. SDK repositories integrate through the suite-owned `run-conformance` action plus adapter/result JSON contracts, not by embedding suite conformance into local pytest/xUnit coverage jobs.
 
-The protocol-side design now freezes three different integration surfaces:
+The protocol-side design freezes three integration surfaces:
 
-1. The static exporter contract is the formal integration path that exists today: capability manifest, exporter command, and canonical vector comparison.
-2. The adapter execution contract is a separate future-facing surface for dynamic behavior execution. It is reserved at the protocol-design layer, but it is not yet the required CI path in this repository.
+1. Recipe-backed canonical vectors define byte-level protocol fixtures in a readable, parameterized form.
+2. The adapter execution contract is the shared behavior-validation path: capability manifest, suite-owned execution plan, SDK-owned adapter command, and suite-validated case results.
 3. The benchmark contract is an informational performance surface. It standardizes scenario selection and result shape without requiring SDK APIs to look identical.
 
-Those surfaces must remain separate. Static vector comparison proves byte-shape alignment against the canonical baseline, adapter execution will eventually prove selected state-machine behavior, and benchmark execution tracks performance deltas without becoming a protocol pass/fail gate.
+Those surfaces must remain separate. Recipe-backed vectors prove byte-shape alignment against the canonical baseline, adapter execution proves selected state-machine behavior, and benchmark execution tracks performance deltas without becoming a protocol pass/fail gate.
 
 The suite-owned public JSON files for that future adapter surface now live at:
 
@@ -74,8 +74,8 @@ The repository-supported integration flow is:
 
 1. Pick an explicit baseline under `protocol/<version>/manifest.json`.
 2. Provide a capability manifest that declares the same protocol version and only the capability tokens the implementation actually supports.
-3. Implement an exporter command that emits a vector manifest using the implementation's real encoder path.
-4. Run the suite-owned `run-conformance` action so the suite computes the selected cases, builds the canonical artifacts, and compares the exported manifest.
+3. Implement an adapter command that consumes the suite-provided execution plan and emits a case-result report.
+4. Run the suite-owned `run-conformance` action so the suite computes the selected cases, builds canonical artifacts, invokes the adapter when configured, and validates the returned results.
 
 Third-party implementations must not depend on:
 
@@ -83,9 +83,7 @@ Third-party implementations must not depend on:
 2. Private repository layout assumptions beyond the published `protocol/`, `schemas/`, and action inputs.
 3. SDK-local test framework filters such as `pytest`, `xUnit`, or `cargo test` as though they were the public conformance API.
 
-If an implementation wants deeper behavior validation before the adapter execution contract lands here, that validation remains repository-local. The shared contract in this repository is still the language-neutral manifest, vector, report, and action surface.
-
-When adapter execution is enabled in a later phase, implementations should expect the suite to hand them an execution-plan JSON that already contains the selected public cases, and they should return a case-result report JSON that follows the published schemas above.
+Implementations should expect the suite to hand them an execution-plan JSON that already contains the selected public cases, and they should return a case-result report JSON that follows the published schemas above.
 
 When benchmark execution is enabled, implementations should expect the suite to hand them a benchmark execution-plan JSON. SDK repositories own their local benchmark runner commands, API calls, and harness internals; this repository owns only the language-neutral scenario and result JSON shapes.
 
@@ -99,14 +97,21 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
+Set the baseline once when running local examples:
+
+```bash
+export NNRP_PROTOCOL_VERSION=nnrp-1-preview3
+export NNRP_PROTOCOL_ROOT=protocol/$NNRP_PROTOCOL_VERSION
+```
+
 Print an execution-plan summary against a versioned sample capability manifest:
 
 ```bash
 cargo run -p nnrp-conformance-runner -- \
   summary \
-  --protocol protocol/nnrp-1-preview2/manifest.json \
-  --capabilities protocol/nnrp-1-preview2/example-capabilities.json \
-  --output artifacts/preview2-summary.json
+  --protocol $NNRP_PROTOCOL_ROOT/manifest.json \
+  --capabilities $NNRP_PROTOCOL_ROOT/example-capabilities.json \
+  --output artifacts/$NNRP_PROTOCOL_VERSION-summary.json
 ```
 
 The `summary` command emits the public conformance report shape defined by `schemas/report.schema.json`, including a feature-level `compatibility_matrix` for dashboards and compatibility tracking. It is not a capability manifest and should never be stored or labeled as one.
@@ -116,9 +121,9 @@ Emit the public adapter execution-plan JSON for the currently selected cases:
 ```bash
 cargo run -p nnrp-conformance-runner -- \
   adapter-plan \
-  --protocol protocol/nnrp-1-preview3/manifest.json \
-  --capabilities protocol/nnrp-1-preview3/example-capabilities.json \
-  --output artifacts/preview3-adapter-plan.json
+  --protocol $NNRP_PROTOCOL_ROOT/manifest.json \
+  --capabilities $NNRP_PROTOCOL_ROOT/example-capabilities.json \
+  --output artifacts/$NNRP_PROTOCOL_VERSION-adapter-plan.json
 ```
 
 The `adapter-plan` command emits the public adapter execution-plan shape defined by `schemas/adapter-execution-plan.schema.json`. Implementations can consume that JSON without linking to Rust crates or reading runner internals.
@@ -130,9 +135,9 @@ Emit the public benchmark execution-plan JSON for a versioned protocol and capab
 ```bash
 cargo run -p nnrp-conformance-runner -- \
   benchmark-plan \
-  --protocol protocol/nnrp-1-preview3/manifest.json \
-  --capabilities protocol/nnrp-1-preview3/example-capabilities.json \
-  --output artifacts/preview3-benchmark-plan.json
+  --protocol $NNRP_PROTOCOL_ROOT/manifest.json \
+  --capabilities $NNRP_PROTOCOL_ROOT/example-capabilities.json \
+  --output artifacts/$NNRP_PROTOCOL_VERSION-benchmark-plan.json
 ```
 
 Validate an SDK benchmark result report against the suite-owned plan:
@@ -150,7 +155,7 @@ Validate the published JSON artifacts for an explicit baseline against the suite
 
 ```bash
 python scripts/validate_public_json.py \
-  --protocol protocol/nnrp-1-preview3/manifest.json
+  --protocol $NNRP_PROTOCOL_ROOT/manifest.json
 ```
 
 The `validate_public_json.py` script is the first-class schema-validation path used by CI. It validates the selected protocol manifest, every referenced case/vector/recipe manifest, the baseline example capability manifest when present, and the suite-owned adapter and benchmark example payloads.
@@ -160,22 +165,22 @@ Generate and verify the canonical vector manifest from a recipe-backed baseline:
 ```bash
 cargo run -p nnrp-conformance-runner -- \
   generate-vectors \
-  --recipe protocol/nnrp-1-preview2/vectors/semantic-vectors.json \
-  --output artifacts/local-preview2-vectors.json
+  --recipe $NNRP_PROTOCOL_ROOT/vectors/semantic-vectors.json \
+  --output artifacts/$NNRP_PROTOCOL_VERSION-vectors.json
 
 cargo run -p nnrp-conformance-runner -- \
   verify-vectors \
-  --recipe protocol/nnrp-1-preview2/vectors/semantic-vectors.json \
-  --manifest artifacts/local-preview2-vectors.json
+  --recipe $NNRP_PROTOCOL_ROOT/vectors/semantic-vectors.json \
+  --manifest artifacts/$NNRP_PROTOCOL_VERSION-vectors.json
 ```
 
-Compare an SDK-exported manifest against the canonical manifest:
+Validate adapter results against a suite-owned plan:
 
 ```bash
 cargo run -p nnrp-conformance-runner -- \
-  compare-vector-manifests \
-  --expected artifacts/local-preview2-vectors.json \
-  --actual /path/to/sdk-vector-manifest.json
+  validate-adapter-results \
+  --plan artifacts/$NNRP_PROTOCOL_VERSION-adapter-plan.json \
+  --results artifacts/adapter-results.json
 ```
 
 ## CI Contract
