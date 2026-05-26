@@ -371,8 +371,8 @@ mod tests {
     use super::{
         AdapterCaseResultReport, AdapterExecutionPlan, BenchmarkExecutionPlan,
         BenchmarkResultReport, CapabilityManifest, CaseManifest, CaseStatus, ProtocolManifest,
-        SemanticVectorManifest, VectorManifest, build_vector_manifest, load_json_file,
-        validate_protocol_alignment, verify_vector_manifest,
+        SemanticVectorManifest, build_vector_manifest, load_json_file, validate_protocol_alignment,
+        verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -563,20 +563,28 @@ mod tests {
     }
 
     #[test]
-    fn loads_preview3_vector_manifest_from_repo_fixture() {
-        let vector_manifest: VectorManifest = load_json_file(
+    fn generates_preview3_semantic_vectors_from_repo_fixture() {
+        let semantic_manifest: SemanticVectorManifest = load_json_file(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("..")
                 .join("..")
                 .join("protocol")
                 .join("nnrp-1-preview3")
                 .join("vectors")
-                .join("golden-vectors.json"),
+                .join("semantic-vectors.json"),
         )
-        .expect("preview3 vector manifest should load");
+        .expect("preview3 semantic vector manifest should load");
+
+        let vector_manifest =
+            build_vector_manifest(&semantic_manifest, "vectors/semantic-vectors.json")
+                .expect("preview3 semantic vectors should generate");
 
         assert_eq!(vector_manifest.protocol_version, "nnrp-1-preview3");
         assert_eq!(vector_manifest.vectors.len(), 23);
+        assert_eq!(
+            vector_manifest.generated_from.as_deref(),
+            Some("vectors/semantic-vectors.json")
+        );
 
         let resumed = vector_manifest
             .vectors

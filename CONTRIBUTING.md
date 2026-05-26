@@ -67,10 +67,10 @@ Before opening or merging a PR, prefer the narrowest validation that proves the 
 - `cargo fmt --all --check`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo test --workspace`
-- `python scripts/validate_public_json.py --protocol protocol/nnrp-1-preview3/manifest.json` when changing public schemas, baseline JSON files, or schema-bound examples
-- `cargo run -p nnrp-conformance-runner -- summary --protocol protocol/nnrp-1-preview2/manifest.json --capabilities protocol/nnrp-1-preview2/example-capabilities.json` when changing baseline selection, manifests, or report shape
-- `cargo run -p nnrp-conformance-runner -- generate-vectors --recipe protocol/nnrp-1-preview2/vectors/semantic-vectors.json --output artifacts/local-preview2-vectors.json` and `verify-vectors --recipe ... --manifest ...` when changing recipe-backed vector generation
-- `cargo run -p nnrp-conformance-runner -- compare-vector-manifests --expected artifacts/local-preview2-vectors.json --actual <sdk-manifest>` when changing SDK comparison flow or the suite-owned action
+- `python scripts/validate_public_json.py --protocol protocol/<protocol-version>/manifest.json` when changing public schemas, baseline JSON files, or schema-bound examples
+- `cargo run -p nnrp-conformance-runner -- summary --protocol protocol/<protocol-version>/manifest.json --capabilities protocol/<protocol-version>/example-capabilities.json` when changing baseline selection, manifests, or report shape
+- `cargo run -p nnrp-conformance-runner -- generate-vectors --recipe protocol/<protocol-version>/vectors/semantic-vectors.json --output artifacts/<protocol-version>-vectors.json` and `verify-vectors --recipe ... --manifest ...` when changing recipe-backed vector generation
+- `cargo run -p nnrp-conformance-runner -- validate-adapter-results --plan <adapter-plan> --results <adapter-results>` when changing adapter result validation or the suite-owned action
 
 PRs that affect CI, schemas, manifest contracts, or future adapter integration should include the exact command or workflow path used for validation.
 
