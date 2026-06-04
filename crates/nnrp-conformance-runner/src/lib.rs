@@ -243,7 +243,7 @@ pub fn build_api_profile_execution_plan(
             operation: recipe.operation.clone(),
             status: recipe.status,
             required_capabilities: required_api_capabilities(recipe),
-            request: recipe.request.clone(),
+            request: substitute_api_profile_request_parameters(recipe),
             expect: recipe.expect.clone(),
         })
         .collect();
@@ -260,6 +260,46 @@ pub fn build_api_profile_execution_plan(
         coverage_matrix,
         cases: selected_cases,
     })
+}
+
+fn substitute_api_profile_request_parameters(
+    recipe: &ApiProfileRecipe,
+) -> nnrp_conformance_fixtures::ApiProfileRecipeRequest {
+    let mut request = recipe.request.clone();
+    substitute_json_parameters(&mut request.body, &recipe.parameters);
+    if let Some(nnrp) = &mut request.nnrp {
+        substitute_json_parameters(nnrp, &recipe.parameters);
+    }
+    request
+}
+
+fn substitute_json_parameters(
+    value: &mut serde_json::Value,
+    parameters: &BTreeMap<String, String>,
+) {
+    match value {
+        serde_json::Value::String(text) => {
+            if let Some(parameter_name) = text
+                .strip_prefix("${")
+                .and_then(|rest| rest.strip_suffix('}'))
+            {
+                if let Some(parameter_value) = parameters.get(parameter_name) {
+                    *text = parameter_value.clone();
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                substitute_json_parameters(item, parameters);
+            }
+        }
+        serde_json::Value::Object(fields) => {
+            for field in fields.values_mut() {
+                substitute_json_parameters(field, parameters);
+            }
+        }
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
+    }
 }
 
 pub fn validate_api_profile_results(
@@ -1519,7 +1559,7 @@ mod tests {
                 streaming: true,
                 non_streaming: true,
                 tool_calls: false,
-                cancellation: false,
+                cancellation: true,
             }],
             extensions: vec![ApiProfileExtensionCapability {
                 name: "diagnostics".to_string(),
@@ -1608,6 +1648,32 @@ mod tests {
     }
 
     #[test]
+    fn api_profile_plan_substitutes_recipe_parameters() {
+        let mut recipe = sample_api_recipe("parameterized-case", false);
+        recipe
+            .parameters
+            .insert("MODEL_ID".to_string(), "backend-error".to_string());
+        recipe.request.body["model"] = serde_json::json!("${MODEL_ID}");
+        recipe.request.nnrp = Some(serde_json::json!({"trace": "${MODEL_ID}"}));
+
+        let plan = build_api_profile_execution_plan(
+            &sample_api_capabilities(),
+            &[recipe],
+            AdapterArtifactContext {
+                results_path: "artifacts/api-profile-results.json".to_string(),
+                evidence_dir: "artifacts/api-profile-evidence".to_string(),
+            },
+        )
+        .expect("api profile plan should build");
+
+        assert_eq!(plan.cases[0].request.body["model"], "backend-error");
+        assert_eq!(
+            plan.cases[0].request.nnrp.as_ref().unwrap()["trace"],
+            "backend-error"
+        );
+    }
+
+    #[test]
     fn api_profile_plan_builds_from_frozen_openai_recipe_catalog() {
         let profile_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
@@ -1640,7 +1706,13 @@ mod tests {
         .expect("api profile plan should build from frozen catalog");
 
         assert_eq!(recipes.len(), 8);
-        assert_eq!(plan.cases.len(), 7);
+        assert_eq!(plan.cases.len(), 8);
+        assert!(
+            plan.cases
+                .iter()
+                .any(|case| case.id == "openai-compatible.chat.backend-error"
+                    && case.request.body["model"] == "backend-error")
+        );
         assert!(
             plan.cases
                 .iter()
@@ -1649,7 +1721,7 @@ mod tests {
         assert!(
             plan.coverage_matrix
                 .iter()
-                .any(|entry| entry.summary.not_claimed_cases == 1)
+                .all(|entry| entry.summary.not_claimed_cases == 0)
         );
     }
 
