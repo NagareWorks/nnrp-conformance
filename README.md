@@ -33,7 +33,12 @@ This repository does not own host-language API ergonomics, runtime-private test 
 2. `crates/nnrp-conformance-runner`: Rust runner and CLI entrypoint.
 3. `protocol/`: versioned protocol baselines and canonical manifests.
 4. `schemas/`: JSON schema files for public manifests and reports.
-5. `docs/todo/`: repository-local execution backlog, split by protocol line and workstream.
+5. `docs/todo/`: repository-local execution backlog, split by protocol line and API profile workstream.
+
+Todo files use explicit ownership directories. Protocol-line work belongs under
+`docs/todo/<protocol-version>/`, such as `docs/todo/nnrp-1-preview3/`. API profile work belongs under
+its own workstream directory, such as `docs/todo/openai-nnrp-api/`, so optional profile conformance
+does not get mixed into a protocol baseline backlog.
 
 ## Current Suite Boundary
 
