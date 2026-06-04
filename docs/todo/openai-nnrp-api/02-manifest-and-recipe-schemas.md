@@ -23,5 +23,5 @@
 - [x] Add `schemas/api-profile-execution-plan.schema.json`.
 - [x] Add `schemas/api-profile-case-results.schema.json`.
 - [x] Keep the suite-owned plan/result shape language-neutral and implementation-agnostic.
-- [ ] Define how profile recipes compile into adapter-facing execution plans.
+- [x] Define how profile recipes compile into adapter-facing execution plans.
 - [x] Define how adapter case results report selected events, terminal outcome, diagnostics, and extension observations.

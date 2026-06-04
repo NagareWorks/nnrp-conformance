@@ -31,6 +31,16 @@
       "type": "string",
       "minLength": 1
     },
+    "status": {
+      "type": "string",
+      "enum": [
+        "mandatory",
+        "optional",
+        "experimental",
+        "deprecated"
+      ],
+      "default": "mandatory"
+    },
     "parameters": {
       "type": "object",
       "additionalProperties": {

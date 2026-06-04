@@ -1,5 +1,6 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use thiserror::Error;
@@ -245,6 +246,146 @@ pub enum AdapterCaseOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiProfileCapabilityManifest {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub adapter: String,
+    pub profile: String,
+    pub schema_version: String,
+    pub compatibility_levels: Vec<u32>,
+    pub operations: Vec<ApiProfileOperationCapability>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extensions: Vec<ApiProfileExtensionCapability>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiProfileOperationCapability {
+    pub name: String,
+    pub streaming: bool,
+    pub non_streaming: bool,
+    pub tool_calls: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub cancellation: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiProfileExtensionCapability {
+    pub name: String,
+    pub critical: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileRecipe {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub id: String,
+    pub profile: String,
+    pub schema_version: String,
+    pub operation: String,
+    #[serde(default = "mandatory_case_status")]
+    pub status: CaseStatus,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub parameters: BTreeMap<String, String>,
+    pub request: ApiProfileRecipeRequest,
+    pub expect: ApiProfileExpectation,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileRecipeRequest {
+    pub body: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nnrp: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileExpectation {
+    pub events: Vec<ApiProfileExpectedEvent>,
+    pub terminal: ApiProfileTerminal,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileExpectedEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub optional: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileExecutionPlan {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub profile: String,
+    pub schema_version: String,
+    pub adapter: String,
+    pub artifacts: AdapterArtifactContext,
+    pub cases: Vec<ApiProfileExecutionCase>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileExecutionCase {
+    pub id: String,
+    pub operation: String,
+    pub status: CaseStatus,
+    pub required_capabilities: Vec<String>,
+    pub request: ApiProfileRecipeRequest,
+    pub expect: ApiProfileExpectation,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileCaseResultReport {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub profile: String,
+    pub schema_version: String,
+    pub adapter: String,
+    pub results: Vec<ApiProfileCaseResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileCaseResult {
+    pub id: String,
+    pub outcome: ApiProfileCaseOutcome,
+    pub terminal: ApiProfileTerminal,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<ApiProfileObservedEvent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diagnostics: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ApiProfileObservedEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    #[serde(flatten)]
+    pub fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiProfileTerminal {
+    Success,
+    Error,
+    Cancelled,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiProfileCaseOutcome {
+    Passed,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConformanceReport {
     pub protocol_version: String,
     pub implementation_name: String,
@@ -320,6 +461,14 @@ pub enum CaseStatus {
     Deprecated,
 }
 
+fn mandatory_case_status() -> CaseStatus {
+    CaseStatus::Mandatory
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 pub fn load_json_file<T>(path: impl AsRef<Path>) -> Result<T, FixtureError>
 where
     T: DeserializeOwned,
@@ -369,10 +518,11 @@ pub fn validate_protocol_alignment(
 #[cfg(test)]
 mod tests {
     use super::{
-        AdapterCaseResultReport, AdapterExecutionPlan, BenchmarkExecutionPlan,
-        BenchmarkResultReport, CapabilityManifest, CaseManifest, CaseStatus, ProtocolManifest,
-        SemanticVectorManifest, build_vector_manifest, load_json_file, validate_protocol_alignment,
-        verify_vector_manifest,
+        AdapterCaseResultReport, AdapterExecutionPlan, ApiProfileCapabilityManifest,
+        ApiProfileCaseResultReport, ApiProfileExecutionPlan, ApiProfileRecipe,
+        BenchmarkExecutionPlan, BenchmarkResultReport, CapabilityManifest, CaseManifest,
+        CaseStatus, ProtocolManifest, SemanticVectorManifest, build_vector_manifest,
+        load_json_file, validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -560,6 +710,74 @@ mod tests {
         assert_eq!(report.protocol_version, "nnrp-1-preview3");
         assert_eq!(report.results.len(), 9);
         assert_eq!(report.environment.os, "linux");
+    }
+
+    #[test]
+    fn loads_api_profile_capabilities_example() {
+        let manifest: ApiProfileCapabilityManifest = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("api-profile-capabilities.sample.json"),
+        )
+        .expect("api profile capabilities example should load");
+
+        assert_eq!(manifest.profile, "openai-compatible");
+        assert_eq!(manifest.schema_version, "openai-compatible/1");
+        assert_eq!(manifest.operations[0].name, "chat.completions.create");
+    }
+
+    #[test]
+    fn loads_api_profile_recipe_example() {
+        let recipe: ApiProfileRecipe = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("api-profile-recipe.sample.json"),
+        )
+        .expect("api profile recipe example should load");
+
+        assert_eq!(recipe.status, CaseStatus::Mandatory);
+        assert_eq!(
+            recipe.expect.events[0].event_type,
+            "response.output_text.delta"
+        );
+    }
+
+    #[test]
+    fn loads_api_profile_execution_plan_example() {
+        let plan: ApiProfileExecutionPlan = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("api-profile-execution-plan.sample.json"),
+        )
+        .expect("api profile execution plan example should load");
+
+        assert_eq!(plan.profile, "openai-compatible");
+        assert_eq!(plan.cases.len(), 1);
+    }
+
+    #[test]
+    fn loads_api_profile_case_results_example() {
+        let report: ApiProfileCaseResultReport = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("api-profile-case-results.sample.json"),
+        )
+        .expect("api profile case results example should load");
+
+        assert_eq!(report.adapter, "vllm-nnrp-adapter");
+        assert_eq!(report.results.len(), 1);
     }
 
     #[test]

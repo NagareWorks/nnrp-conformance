@@ -2,13 +2,16 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use nnrp_conformance_fixtures::{
     AdapterArtifactContext, AdapterCaseOutcome, AdapterCaseResultReport, AdapterExecutionPlan,
-    BenchmarkArtifactContext, BenchmarkExecutionPlan, BenchmarkOutcome, BenchmarkResultReport,
-    CapabilityManifest, CaseManifest, ProtocolManifest, SemanticVectorManifest, VectorManifest,
-    build_vector_manifest, load_json_file, verify_vector_manifest,
+    ApiProfileCapabilityManifest, ApiProfileCaseResultReport, ApiProfileExecutionPlan,
+    ApiProfileRecipe, BenchmarkArtifactContext, BenchmarkExecutionPlan, BenchmarkOutcome,
+    BenchmarkResultReport, CapabilityManifest, CaseManifest, ProtocolManifest,
+    SemanticVectorManifest, VectorManifest, build_vector_manifest, load_json_file,
+    verify_vector_manifest,
 };
 use nnrp_conformance_runner::{
     build_adapter_execution_plan, build_adapter_execution_plan_for_manifests,
-    build_benchmark_execution_plan, build_execution_plan, build_execution_plan_for_manifests,
+    build_api_profile_execution_plan, build_benchmark_execution_plan, build_execution_plan,
+    build_execution_plan_for_manifests, validate_api_profile_results,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -62,6 +65,18 @@ enum Command {
         #[arg(long, default_value = "artifacts/benchmark-evidence")]
         evidence_dir: PathBuf,
     },
+    ApiProfilePlan {
+        #[arg(long)]
+        capabilities: PathBuf,
+        #[arg(long, required = true)]
+        recipes: Vec<PathBuf>,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, default_value = "artifacts/api-profile-results.json")]
+        results_path: PathBuf,
+        #[arg(long, default_value = "artifacts/api-profile-evidence")]
+        evidence_dir: PathBuf,
+    },
     GenerateVectors {
         #[arg(long)]
         recipe: PathBuf,
@@ -87,6 +102,12 @@ enum Command {
         results: PathBuf,
     },
     ValidateBenchmarkResults {
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        results: PathBuf,
+    },
+    ValidateApiProfileResults {
         #[arg(long)]
         plan: PathBuf,
         #[arg(long)]
@@ -235,6 +256,32 @@ fn main() -> Result<()> {
                 format!("{}\n", serde_json::to_string_pretty(&plan)?),
             )?;
         }
+        Command::ApiProfilePlan {
+            capabilities,
+            recipes,
+            output,
+            results_path,
+            evidence_dir,
+        } => {
+            let capability_manifest: ApiProfileCapabilityManifest = load_json_file(&capabilities)?;
+            let recipe_manifests = recipes
+                .iter()
+                .map(load_json_file::<ApiProfileRecipe>)
+                .collect::<Result<Vec<_>, _>>()?;
+            let artifacts = AdapterArtifactContext {
+                results_path: results_path.display().to_string(),
+                evidence_dir: evidence_dir.display().to_string(),
+            };
+            let plan = build_api_profile_execution_plan(
+                &capability_manifest,
+                &recipe_manifests,
+                artifacts,
+            )?;
+            std::fs::write(
+                output,
+                format!("{}\n", serde_json::to_string_pretty(&plan)?),
+            )?;
+        }
         Command::GenerateVectors { recipe, output } => {
             let semantic_manifest: SemanticVectorManifest = load_json_file(&recipe)?;
             let generated_from = recipe
@@ -273,6 +320,12 @@ fn main() -> Result<()> {
             let benchmark_plan: BenchmarkExecutionPlan = load_json_file(&plan)?;
             let benchmark_results: BenchmarkResultReport = load_json_file(&results)?;
             let summary = validate_benchmark_results(&benchmark_plan, &benchmark_results)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Command::ValidateApiProfileResults { plan, results } => {
+            let api_plan: ApiProfileExecutionPlan = load_json_file(&plan)?;
+            let api_results: ApiProfileCaseResultReport = load_json_file(&results)?;
+            let summary = validate_api_profile_results(&api_plan, &api_results)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
     }

@@ -1,9 +1,11 @@
 use nnrp_conformance_fixtures::{
-    AdapterArtifactContext, AdapterExecutionCase, AdapterExecutionPlan, BenchmarkArtifactContext,
-    BenchmarkCategory, BenchmarkExecutionPlan, BenchmarkScenario, BenchmarkWorkload,
-    CapabilityManifest, CaseDefinition, CaseManifest, CaseStatus, CompatibilityMatrixEntry,
-    ConformanceReport, FixtureError, ProtocolManifest, ReportCase, ReportStatusSummary,
-    ReportSummary, validate_protocol_alignment,
+    AdapterArtifactContext, AdapterExecutionCase, AdapterExecutionPlan,
+    ApiProfileCapabilityManifest, ApiProfileCaseOutcome, ApiProfileCaseResultReport,
+    ApiProfileExecutionCase, ApiProfileExecutionPlan, ApiProfileExpectedEvent, ApiProfileRecipe,
+    BenchmarkArtifactContext, BenchmarkCategory, BenchmarkExecutionPlan, BenchmarkScenario,
+    BenchmarkWorkload, CapabilityManifest, CaseDefinition, CaseManifest, CaseStatus,
+    CompatibilityMatrixEntry, ConformanceReport, FixtureError, ProtocolManifest, ReportCase,
+    ReportStatusSummary, ReportSummary, validate_protocol_alignment,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -13,6 +15,14 @@ pub enum CaseSelection {
     Selected,
     NotClaimed,
     Informational,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct ApiProfileValidationSummary {
+    pub selected_cases: usize,
+    pub passed_cases: usize,
+    pub failed_cases: usize,
+    pub skipped_cases: usize,
 }
 
 impl CaseSelection {
@@ -212,6 +222,364 @@ pub fn build_benchmark_execution_plan(
         artifacts,
         scenarios: default_benchmark_scenarios(&capability_manifest.supports),
     }
+}
+
+pub fn build_api_profile_execution_plan(
+    capability_manifest: &ApiProfileCapabilityManifest,
+    recipes: &[ApiProfileRecipe],
+    artifacts: AdapterArtifactContext,
+) -> Result<ApiProfileExecutionPlan, FixtureError> {
+    validate_api_profile_alignment(capability_manifest, recipes)?;
+
+    let selected_cases = recipes
+        .iter()
+        .filter(|recipe| recipe_is_claimed(capability_manifest, recipe))
+        .map(|recipe| ApiProfileExecutionCase {
+            id: recipe.id.clone(),
+            operation: recipe.operation.clone(),
+            status: recipe.status,
+            required_capabilities: required_api_capabilities(recipe),
+            request: recipe.request.clone(),
+            expect: recipe.expect.clone(),
+        })
+        .collect();
+
+    Ok(ApiProfileExecutionPlan {
+        schema: Some(
+            "https://github.com/NagareWorks/nnrp-conformance/schemas/api-profile-execution-plan.schema.json"
+                .to_string(),
+        ),
+        profile: capability_manifest.profile.clone(),
+        schema_version: capability_manifest.schema_version.clone(),
+        adapter: capability_manifest.adapter.clone(),
+        artifacts,
+        cases: selected_cases,
+    })
+}
+
+pub fn validate_api_profile_results(
+    expected_plan: &ApiProfileExecutionPlan,
+    actual_report: &ApiProfileCaseResultReport,
+) -> Result<ApiProfileValidationSummary, FixtureError> {
+    if expected_plan.profile != actual_report.profile {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "api profile mismatch: expected {}, got {}",
+                expected_plan.profile, actual_report.profile
+            ),
+        });
+    }
+    if expected_plan.schema_version != actual_report.schema_version {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "api profile schema version mismatch: expected {}, got {}",
+                expected_plan.schema_version, actual_report.schema_version
+            ),
+        });
+    }
+    if expected_plan.adapter != actual_report.adapter {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "api profile adapter mismatch: expected {}, got {}",
+                expected_plan.adapter, actual_report.adapter
+            ),
+        });
+    }
+
+    let expected_cases = expected_plan
+        .cases
+        .iter()
+        .map(|case| (case.id.as_str(), case))
+        .collect::<BTreeMap<_, _>>();
+    let mut actual_ids = BTreeSet::new();
+    let mut summary = ApiProfileValidationSummary {
+        selected_cases: expected_cases.len(),
+        passed_cases: 0,
+        failed_cases: 0,
+        skipped_cases: 0,
+    };
+
+    for result in &actual_report.results {
+        let expected_case =
+            expected_cases
+                .get(result.id.as_str())
+                .ok_or_else(|| FixtureError::Validation {
+                    message: format!(
+                        "api profile results contain an unexpected case id: {}",
+                        result.id
+                    ),
+                })?;
+        if !actual_ids.insert(result.id.as_str()) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "api profile results contain a duplicate case id: {}",
+                    result.id
+                ),
+            });
+        }
+
+        match result.outcome {
+            ApiProfileCaseOutcome::Passed => {
+                if expected_case.expect.terminal != result.terminal {
+                    return Err(FixtureError::Validation {
+                        message: format!(
+                            "api profile case {} terminal mismatch: expected {:?}, got {:?}",
+                            result.id, expected_case.expect.terminal, result.terminal
+                        ),
+                    });
+                }
+                validate_expected_api_events(
+                    &expected_case.expect.events,
+                    &result.events,
+                    result.id.as_str(),
+                )?;
+                summary.passed_cases += 1;
+            }
+            ApiProfileCaseOutcome::Failed => summary.failed_cases += 1,
+            ApiProfileCaseOutcome::Skipped => summary.skipped_cases += 1,
+        }
+    }
+
+    if actual_ids.len() != expected_cases.len() {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "api profile results are missing {} selected case(s)",
+                expected_cases.len().saturating_sub(actual_ids.len())
+            ),
+        });
+    }
+
+    Ok(summary)
+}
+
+fn validate_api_profile_alignment(
+    capability_manifest: &ApiProfileCapabilityManifest,
+    recipes: &[ApiProfileRecipe],
+) -> Result<(), FixtureError> {
+    if capability_manifest.profile != "openai-compatible" {
+        return Err(FixtureError::Validation {
+            message: format!("unsupported api profile: {}", capability_manifest.profile),
+        });
+    }
+    if capability_manifest.schema_version != "openai-compatible/1" {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "unsupported api profile schema version: {}",
+                capability_manifest.schema_version
+            ),
+        });
+    }
+
+    for recipe in recipes {
+        if recipe.profile != capability_manifest.profile {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "api recipe {} profile mismatch: expected {}, got {}",
+                    recipe.id, capability_manifest.profile, recipe.profile
+                ),
+            });
+        }
+        if recipe.schema_version != capability_manifest.schema_version {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "api recipe {} schema version mismatch: expected {}, got {}",
+                    recipe.id, capability_manifest.schema_version, recipe.schema_version
+                ),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn recipe_is_claimed(
+    capability_manifest: &ApiProfileCapabilityManifest,
+    recipe: &ApiProfileRecipe,
+) -> bool {
+    let Some(operation) = capability_manifest
+        .operations
+        .iter()
+        .find(|operation| operation.name == recipe.operation)
+    else {
+        return false;
+    };
+
+    if recipe_requires_streaming(recipe) && !operation.streaming {
+        return false;
+    }
+    if !recipe_requires_streaming(recipe) && !operation.non_streaming {
+        return false;
+    }
+    if recipe_requires_tool_calls(recipe) && !operation.tool_calls {
+        return false;
+    }
+    if recipe_requires_cancellation(recipe) && !operation.cancellation {
+        return false;
+    }
+
+    recipe
+        .request
+        .nnrp
+        .as_ref()
+        .and_then(|nnrp| nnrp.get("extensions"))
+        .and_then(|extensions| extensions.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|extension| extension.as_str())
+        .all(|extension| {
+            capability_manifest
+                .extensions
+                .iter()
+                .any(|declared| declared.name == extension)
+        })
+}
+
+fn required_api_capabilities(recipe: &ApiProfileRecipe) -> Vec<String> {
+    let mut capabilities = vec![format!("api.{}", recipe.operation)];
+    capabilities.push(
+        if recipe_requires_streaming(recipe) {
+            "api.streaming"
+        } else {
+            "api.non_streaming"
+        }
+        .to_string(),
+    );
+
+    if recipe_requires_tool_calls(recipe) {
+        capabilities.push("api.tool_calls".to_string());
+    }
+    if recipe_requires_cancellation(recipe) {
+        capabilities.push("api.cancellation".to_string());
+    }
+    if let Some(extensions) = recipe
+        .request
+        .nnrp
+        .as_ref()
+        .and_then(|nnrp| nnrp.get("extensions"))
+        .and_then(|extensions| extensions.as_array())
+    {
+        capabilities.extend(
+            extensions
+                .iter()
+                .filter_map(|extension| extension.as_str())
+                .map(|extension| format!("api.extension.{extension}")),
+        );
+    }
+
+    capabilities.sort();
+    capabilities.dedup();
+    capabilities
+}
+
+fn recipe_requires_streaming(recipe: &ApiProfileRecipe) -> bool {
+    recipe
+        .request
+        .body
+        .get("stream")
+        .and_then(|stream| stream.as_bool())
+        .unwrap_or(false)
+}
+
+fn recipe_requires_tool_calls(recipe: &ApiProfileRecipe) -> bool {
+    recipe
+        .request
+        .body
+        .get("tools")
+        .and_then(|tools| tools.as_array())
+        .is_some_and(|tools| !tools.is_empty())
+}
+
+fn recipe_requires_cancellation(recipe: &ApiProfileRecipe) -> bool {
+    recipe
+        .request
+        .nnrp
+        .as_ref()
+        .and_then(|nnrp| nnrp.get("cancel_after_events"))
+        .and_then(|count| count.as_u64())
+        .is_some()
+}
+
+fn validate_expected_api_events(
+    expected_events: &[ApiProfileExpectedEvent],
+    actual_events: &[nnrp_conformance_fixtures::ApiProfileObservedEvent],
+    case_id: &str,
+) -> Result<(), FixtureError> {
+    let mut search_from = 0usize;
+
+    for expected in expected_events {
+        let min_count = expected.min_count.unwrap_or(u64::from(!expected.optional));
+        let observed_count = actual_events
+            .iter()
+            .filter(|event| event.event_type == expected.event_type)
+            .count() as u64;
+        if observed_count < min_count {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "api profile case {case_id} expected event {} at least {} time(s), got {}",
+                    expected.event_type, min_count, observed_count
+                ),
+            });
+        }
+
+        if expected.optional && observed_count == 0 {
+            continue;
+        }
+
+        if min_count > 0 {
+            let Some((relative_index, event)) = actual_events
+                .iter()
+                .skip(search_from)
+                .enumerate()
+                .find(|(_, event)| event.event_type == expected.event_type)
+            else {
+                return Err(FixtureError::Validation {
+                    message: format!(
+                        "api profile case {case_id} did not observe event {} in expected order",
+                        expected.event_type
+                    ),
+                });
+            };
+            validate_expected_api_event_fields(expected, event, case_id)?;
+            search_from += relative_index + 1;
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_expected_api_event_fields(
+    expected: &ApiProfileExpectedEvent,
+    actual: &nnrp_conformance_fixtures::ApiProfileObservedEvent,
+    case_id: &str,
+) -> Result<(), FixtureError> {
+    let Some(expected_fields) = expected
+        .fields
+        .as_ref()
+        .and_then(|fields| fields.as_object())
+    else {
+        return Ok(());
+    };
+
+    for (field, expected_value) in expected_fields {
+        let Some(actual_value) = actual.fields.get(field) else {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "api profile case {case_id} event {} missing expected field {field}",
+                    expected.event_type
+                ),
+            });
+        };
+        if actual_value != expected_value {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "api profile case {case_id} event {} field {field} mismatch",
+                    expected.event_type
+                ),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 fn default_benchmark_scenarios(supports: &[String]) -> Vec<BenchmarkScenario> {
@@ -499,12 +867,18 @@ pub fn build_adapter_execution_plan_for_manifests<'a>(
 mod tests {
     use super::{
         build_adapter_execution_plan, build_adapter_execution_plan_for_manifests,
-        build_benchmark_execution_plan, build_execution_plan, build_execution_plan_for_manifests,
+        build_api_profile_execution_plan, build_benchmark_execution_plan, build_execution_plan,
+        build_execution_plan_for_manifests, validate_api_profile_results,
     };
     use nnrp_conformance_fixtures::{
-        AdapterArtifactContext, BenchmarkArtifactContext, CapabilityManifest, CaseDefinition,
+        AdapterArtifactContext, ApiProfileCapabilityManifest, ApiProfileCaseOutcome,
+        ApiProfileCaseResult, ApiProfileCaseResultReport, ApiProfileExpectation,
+        ApiProfileExpectedEvent, ApiProfileExtensionCapability, ApiProfileObservedEvent,
+        ApiProfileOperationCapability, ApiProfileRecipe, ApiProfileRecipeRequest,
+        ApiProfileTerminal, BenchmarkArtifactContext, CapabilityManifest, CaseDefinition,
         CaseLayer, CaseManifest, CaseStatus, ProtocolManifest, load_json_file,
     };
+    use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -1017,5 +1391,179 @@ mod tests {
                 .iter()
                 .any(|scenario| scenario.id == "l4.transport.quic.loopback.throughput")
         );
+    }
+
+    fn sample_api_capabilities() -> ApiProfileCapabilityManifest {
+        ApiProfileCapabilityManifest {
+            schema: None,
+            adapter: "vllm-nnrp-adapter".to_string(),
+            profile: "openai-compatible".to_string(),
+            schema_version: "openai-compatible/1".to_string(),
+            compatibility_levels: vec![1],
+            operations: vec![ApiProfileOperationCapability {
+                name: "chat.completions.create".to_string(),
+                streaming: true,
+                non_streaming: true,
+                tool_calls: false,
+                cancellation: false,
+            }],
+            extensions: vec![ApiProfileExtensionCapability {
+                name: "diagnostics".to_string(),
+                critical: false,
+                description: None,
+            }],
+        }
+    }
+
+    fn sample_api_recipe(id: &str, stream: bool) -> ApiProfileRecipe {
+        ApiProfileRecipe {
+            schema: None,
+            id: id.to_string(),
+            profile: "openai-compatible".to_string(),
+            schema_version: "openai-compatible/1".to_string(),
+            operation: "chat.completions.create".to_string(),
+            status: CaseStatus::Mandatory,
+            parameters: BTreeMap::new(),
+            request: ApiProfileRecipeRequest {
+                body: serde_json::json!({
+                    "model": "example-model",
+                    "messages": [{"role": "user", "content": "Say hello."}],
+                    "stream": stream
+                }),
+                nnrp: None,
+            },
+            expect: ApiProfileExpectation {
+                events: vec![
+                    ApiProfileExpectedEvent {
+                        event_type: "response.output_text.delta".to_string(),
+                        optional: false,
+                        min_count: Some(1),
+                        fields: None,
+                    },
+                    ApiProfileExpectedEvent {
+                        event_type: "response.completed".to_string(),
+                        optional: true,
+                        min_count: None,
+                        fields: None,
+                    },
+                ],
+                terminal: ApiProfileTerminal::Success,
+            },
+        }
+    }
+
+    #[test]
+    fn api_profile_plan_selects_recipes_claimed_by_capabilities() {
+        let mut unsupported_tool_recipe = sample_api_recipe("tool-case", true);
+        unsupported_tool_recipe.request.body["tools"] = serde_json::json!([
+            {"type": "function", "function": {"name": "lookup"}}
+        ]);
+
+        let plan = build_api_profile_execution_plan(
+            &sample_api_capabilities(),
+            &[
+                sample_api_recipe("streaming-case", true),
+                sample_api_recipe("non-streaming-case", false),
+                unsupported_tool_recipe,
+            ],
+            AdapterArtifactContext {
+                results_path: "artifacts/api-profile-results.json".to_string(),
+                evidence_dir: "artifacts/api-profile-evidence".to_string(),
+            },
+        )
+        .expect("api profile plan should build");
+
+        assert_eq!(plan.adapter, "vllm-nnrp-adapter");
+        assert_eq!(plan.cases.len(), 2);
+        assert!(plan.cases.iter().any(|case| {
+            case.id == "streaming-case"
+                && case
+                    .required_capabilities
+                    .contains(&"api.streaming".to_string())
+        }));
+        assert!(plan.cases.iter().any(|case| {
+            case.id == "non-streaming-case"
+                && case
+                    .required_capabilities
+                    .contains(&"api.non_streaming".to_string())
+        }));
+    }
+
+    #[test]
+    fn api_profile_results_validate_event_order_and_terminal() {
+        let plan = build_api_profile_execution_plan(
+            &sample_api_capabilities(),
+            &[sample_api_recipe("streaming-case", true)],
+            AdapterArtifactContext {
+                results_path: "artifacts/api-profile-results.json".to_string(),
+                evidence_dir: "artifacts/api-profile-evidence".to_string(),
+            },
+        )
+        .expect("api profile plan should build");
+
+        let summary = validate_api_profile_results(
+            &plan,
+            &ApiProfileCaseResultReport {
+                schema: None,
+                profile: "openai-compatible".to_string(),
+                schema_version: "openai-compatible/1".to_string(),
+                adapter: "vllm-nnrp-adapter".to_string(),
+                results: vec![ApiProfileCaseResult {
+                    id: "streaming-case".to_string(),
+                    outcome: ApiProfileCaseOutcome::Passed,
+                    terminal: ApiProfileTerminal::Success,
+                    events: vec![
+                        ApiProfileObservedEvent {
+                            event_type: "response.output_text.delta".to_string(),
+                            fields: BTreeMap::new(),
+                        },
+                        ApiProfileObservedEvent {
+                            event_type: "response.completed".to_string(),
+                            fields: BTreeMap::new(),
+                        },
+                    ],
+                    diagnostics: None,
+                    message: None,
+                }],
+            },
+        )
+        .expect("api profile results should validate");
+
+        assert_eq!(summary.selected_cases, 1);
+        assert_eq!(summary.passed_cases, 1);
+    }
+
+    #[test]
+    fn api_profile_results_reject_missing_required_event() {
+        let plan = build_api_profile_execution_plan(
+            &sample_api_capabilities(),
+            &[sample_api_recipe("streaming-case", true)],
+            AdapterArtifactContext {
+                results_path: "artifacts/api-profile-results.json".to_string(),
+                evidence_dir: "artifacts/api-profile-evidence".to_string(),
+            },
+        )
+        .expect("api profile plan should build");
+
+        let error = validate_api_profile_results(
+            &plan,
+            &ApiProfileCaseResultReport {
+                schema: None,
+                profile: "openai-compatible".to_string(),
+                schema_version: "openai-compatible/1".to_string(),
+                adapter: "vllm-nnrp-adapter".to_string(),
+                results: vec![ApiProfileCaseResult {
+                    id: "streaming-case".to_string(),
+                    outcome: ApiProfileCaseOutcome::Passed,
+                    terminal: ApiProfileTerminal::Success,
+                    events: vec![],
+                    diagnostics: None,
+                    message: None,
+                }],
+            },
+        )
+        .expect_err("api profile results should reject missing required event");
+
+        assert!(error.to_string().contains("response.output_text.delta"));
     }
 }
