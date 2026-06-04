@@ -136,6 +136,31 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
     if benchmark_results_example.exists():
         validate_json(schema_root / "benchmark-results.schema.json", benchmark_results_example)
 
+    api_profile_capabilities_example = docs_examples / "api-profile-capabilities.sample.json"
+    if api_profile_capabilities_example.exists():
+        validate_json(
+            schema_root / "api-profile-capabilities.schema.json",
+            api_profile_capabilities_example,
+        )
+
+    api_profile_recipe_example = docs_examples / "api-profile-recipe.sample.json"
+    if api_profile_recipe_example.exists():
+        validate_json(schema_root / "api-profile-recipe.schema.json", api_profile_recipe_example)
+
+    api_profile_plan_example = docs_examples / "api-profile-execution-plan.sample.json"
+    if api_profile_plan_example.exists():
+        validate_json(
+            schema_root / "api-profile-execution-plan.schema.json",
+            api_profile_plan_example,
+        )
+
+    api_profile_results_example = docs_examples / "api-profile-case-results.sample.json"
+    if api_profile_results_example.exists():
+        validate_json(
+            schema_root / "api-profile-case-results.schema.json",
+            api_profile_results_example,
+        )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(

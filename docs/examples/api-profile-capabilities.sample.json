@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/api-profile-capabilities.schema.json",
+  "adapter": "vllm-nnrp-adapter",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "compatibility_levels": [
+    1
+  ],
+  "operations": [
+    {
+      "name": "chat.completions.create",
+      "streaming": true,
+      "non_streaming": true,
+      "tool_calls": true,
+      "cancellation": true
+    }
+  ],
+  "extensions": [
+    {
+      "name": "vllm.diagnostics",
+      "critical": false,
+      "description": "Adapter diagnostics derived from observation records."
+    }
+  ]
+}

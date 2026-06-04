@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/api-profile-case-results.schema.json",
+  "title": "NNRP API Profile Case Results",
+  "type": "object",
+  "required": [
+    "profile",
+    "schema_version",
+    "adapter",
+    "results"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "const": "openai-compatible"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "openai-compatible/1"
+    },
+    "adapter": {
+      "type": "string",
+      "minLength": 1
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "outcome",
+          "terminal"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "skipped"
+            ]
+          },
+          "terminal": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error",
+              "cancelled"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "diagnostics": {
+            "type": "object"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

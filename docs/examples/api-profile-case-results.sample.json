@@ -1,0 +1,32 @@
+{
+  "$schema": "../../schemas/api-profile-case-results.schema.json",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "adapter": "vllm-nnrp-adapter",
+  "results": [
+    {
+      "id": "openai-compatible.chat.streaming-text",
+      "outcome": "passed",
+      "terminal": "success",
+      "events": [
+        {
+          "type": "response.output_text.delta",
+          "index": 0,
+          "delta": "hello"
+        },
+        {
+          "type": "response.usage",
+          "usage": {
+            "input_tokens": 2,
+            "output_tokens": 1,
+            "total_tokens": 3
+          }
+        }
+      ],
+      "diagnostics": {
+        "selected_model_id": "example-model",
+        "selected_operation": "chat.completions.create"
+      }
+    }
+  ]
+}

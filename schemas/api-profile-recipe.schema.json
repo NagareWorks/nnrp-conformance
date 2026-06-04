@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/api-profile-recipe.schema.json",
+  "title": "NNRP API Profile Recipe",
+  "type": "object",
+  "required": [
+    "id",
+    "profile",
+    "schema_version",
+    "operation",
+    "request",
+    "expect"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "type": "string",
+      "const": "openai-compatible"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "openai-compatible/1"
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "body"
+      ],
+      "properties": {
+        "body": {
+          "type": "object"
+        },
+        "nnrp": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "expect": {
+      "type": "object",
+      "required": [
+        "events",
+        "terminal"
+      ],
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "optional": {
+                "type": "boolean",
+                "default": false
+              },
+              "min_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fields": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "terminal": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error",
+            "cancelled"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

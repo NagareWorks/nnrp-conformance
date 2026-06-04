@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/api-profile-capabilities.schema.json",
+  "title": "NNRP API Profile Capability Manifest",
+  "type": "object",
+  "required": [
+    "adapter",
+    "profile",
+    "schema_version",
+    "compatibility_levels",
+    "operations"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "adapter": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "type": "string",
+      "const": "openai-compatible"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "openai-compatible/1"
+    },
+    "compatibility_levels": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "streaming",
+          "non_streaming",
+          "tool_calls"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "streaming": {
+            "type": "boolean"
+          },
+          "non_streaming": {
+            "type": "boolean"
+          },
+          "tool_calls": {
+            "type": "boolean"
+          },
+          "cancellation": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "critical"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "critical": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": false
+}

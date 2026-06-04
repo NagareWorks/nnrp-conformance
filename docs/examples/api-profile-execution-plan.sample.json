@@ -1,0 +1,41 @@
+{
+  "$schema": "../../schemas/api-profile-execution-plan.schema.json",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "adapter": "vllm-nnrp-adapter",
+  "artifacts": {
+    "results_path": "artifacts/api-profile-results.json",
+    "evidence_dir": "artifacts/api-profile-evidence"
+  },
+  "cases": [
+    {
+      "id": "openai-compatible.chat.streaming-text",
+      "operation": "chat.completions.create",
+      "status": "mandatory",
+      "required_capabilities": [
+        "openai-compatible.level1.chat.streaming"
+      ],
+      "request": {
+        "body": {
+          "model": "example-model",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Say hello."
+            }
+          ],
+          "stream": true
+        }
+      },
+      "expect": {
+        "events": [
+          {
+            "type": "response.output_text.delta",
+            "min_count": 1
+          }
+        ],
+        "terminal": "success"
+      }
+    }
+  ]
+}

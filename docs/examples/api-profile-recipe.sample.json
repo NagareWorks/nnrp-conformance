@@ -1,0 +1,42 @@
+{
+  "$schema": "../../schemas/api-profile-recipe.schema.json",
+  "id": "openai-compatible.chat.streaming-text",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "operation": "chat.completions.create",
+  "parameters": {
+    "MODEL_ID": "example-model"
+  },
+  "request": {
+    "body": {
+      "model": "${MODEL_ID}",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Say hello."
+        }
+      ],
+      "stream": true
+    },
+    "nnrp": {
+      "diagnostics": true
+    }
+  },
+  "expect": {
+    "events": [
+      {
+        "type": "response.output_text.delta",
+        "min_count": 1
+      },
+      {
+        "type": "response.usage",
+        "optional": true
+      },
+      {
+        "type": "response.completed",
+        "optional": true
+      }
+    ],
+    "terminal": "success"
+  }
+}
