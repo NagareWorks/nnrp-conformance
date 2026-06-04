@@ -1,6 +1,6 @@
 {
-  "$schema": "../../schemas/api-profile-recipe.schema.json",
-  "id": "openai-compatible.chat.streaming-text",
+  "$schema": "../../../../schemas/api-profile-recipe.schema.json",
+  "id": "openai-compatible.chat.usage",
   "profile": "openai-compatible",
   "schema_version": "openai-compatible/1",
   "operation": "chat.completions.create",
@@ -9,6 +9,7 @@
     "api.chat.completions.create",
     "api.streaming"
   ],
+  "status": "mandatory",
   "parameters": {
     "MODEL_ID": "example-model"
   },
@@ -21,25 +22,21 @@
           "content": "Say hello."
         }
       ],
-      "stream": true
-    },
-    "nnrp": {
-      "diagnostics": true
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      }
     }
   },
   "expect": {
     "events": [
       {
         "type": "response.output_text.delta",
-        "min_count": 1
+        "optional": true
       },
       {
         "type": "response.usage",
-        "optional": true
-      },
-      {
-        "type": "response.completed",
-        "optional": true
+        "min_count": 1
       }
     ],
     "terminal": "success"

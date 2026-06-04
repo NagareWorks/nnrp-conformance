@@ -3,8 +3,8 @@ use clap::{Parser, Subcommand};
 use nnrp_conformance_fixtures::{
     AdapterArtifactContext, AdapterCaseOutcome, AdapterCaseResultReport, AdapterExecutionPlan,
     ApiProfileCapabilityManifest, ApiProfileCaseResultReport, ApiProfileExecutionPlan,
-    ApiProfileRecipe, BenchmarkArtifactContext, BenchmarkExecutionPlan, BenchmarkOutcome,
-    BenchmarkResultReport, CapabilityManifest, CaseManifest, ProtocolManifest,
+    ApiProfileRecipe, ApiProfileSuiteManifest, BenchmarkArtifactContext, BenchmarkExecutionPlan,
+    BenchmarkOutcome, BenchmarkResultReport, CapabilityManifest, CaseManifest, ProtocolManifest,
     SemanticVectorManifest, VectorManifest, build_vector_manifest, load_json_file,
     verify_vector_manifest,
 };
@@ -67,8 +67,12 @@ enum Command {
     },
     ApiProfilePlan {
         #[arg(long)]
+        protocol: Option<PathBuf>,
+        #[arg(long)]
+        profile: Option<PathBuf>,
+        #[arg(long)]
         capabilities: PathBuf,
-        #[arg(long, required = true)]
+        #[arg(long, required_unless_present = "profile")]
         recipes: Vec<PathBuf>,
         #[arg(long)]
         output: PathBuf,
@@ -257,6 +261,8 @@ fn main() -> Result<()> {
             )?;
         }
         Command::ApiProfilePlan {
+            protocol,
+            profile,
             capabilities,
             recipes,
             output,
@@ -264,7 +270,12 @@ fn main() -> Result<()> {
             evidence_dir,
         } => {
             let capability_manifest: ApiProfileCapabilityManifest = load_json_file(&capabilities)?;
-            let recipe_manifests = recipes
+            let recipe_paths = api_profile_recipe_paths(profile.as_ref(), recipes)?;
+            if let (Some(protocol_path), Some(profile_path)) = (protocol.as_ref(), profile.as_ref())
+            {
+                validate_api_profile_protocol_baseline(protocol_path, profile_path)?;
+            }
+            let recipe_manifests = recipe_paths
                 .iter()
                 .map(load_json_file::<ApiProfileRecipe>)
                 .collect::<Result<Vec<_>, _>>()?;
@@ -330,6 +341,43 @@ fn main() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn api_profile_recipe_paths(
+    profile_path: Option<&PathBuf>,
+    explicit_recipes: Vec<PathBuf>,
+) -> Result<Vec<PathBuf>> {
+    if let Some(profile_path) = profile_path {
+        let profile_manifest: ApiProfileSuiteManifest = load_json_file(profile_path)?;
+        let profile_root = profile_path.parent().unwrap_or(std::path::Path::new("."));
+        let mut recipe_paths = profile_manifest
+            .recipe_manifests
+            .iter()
+            .map(|relative_path| profile_root.join(relative_path))
+            .collect::<Vec<_>>();
+        recipe_paths.extend(explicit_recipes);
+        return Ok(recipe_paths);
+    }
+
+    Ok(explicit_recipes)
+}
+
+fn validate_api_profile_protocol_baseline(
+    protocol_path: &PathBuf,
+    profile_path: &PathBuf,
+) -> Result<()> {
+    let protocol_manifest: ProtocolManifest = load_json_file(protocol_path)?;
+    let profile_manifest: ApiProfileSuiteManifest = load_json_file(profile_path)?;
+    anyhow::ensure!(
+        profile_manifest
+            .protocol_baselines
+            .contains(&protocol_manifest.protocol_version),
+        "api profile {} {} is not declared for protocol baseline {}",
+        profile_manifest.profile,
+        profile_manifest.schema_version,
+        protocol_manifest.protocol_version
+    );
     Ok(())
 }
 

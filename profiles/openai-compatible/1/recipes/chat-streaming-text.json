@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/api-profile-recipe.schema.json",
+  "$schema": "../../../../schemas/api-profile-recipe.schema.json",
   "id": "openai-compatible.chat.streaming-text",
   "profile": "openai-compatible",
   "schema_version": "openai-compatible/1",
@@ -9,6 +9,7 @@
     "api.chat.completions.create",
     "api.streaming"
   ],
+  "status": "mandatory",
   "parameters": {
     "MODEL_ID": "example-model"
   },
@@ -22,9 +23,6 @@
         }
       ],
       "stream": true
-    },
-    "nnrp": {
-      "diagnostics": true
     }
   },
   "expect": {
@@ -32,14 +30,6 @@
       {
         "type": "response.output_text.delta",
         "min_count": 1
-      },
-      {
-        "type": "response.usage",
-        "optional": true
-      },
-      {
-        "type": "response.completed",
-        "optional": true
       }
     ],
     "terminal": "success"

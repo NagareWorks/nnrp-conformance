@@ -16,7 +16,7 @@
 - [x] Allow parameter placeholders such as `${MODEL_ID}` without hard-coding one provider or model.
 - [x] Represent expected event sequences with `type`, `optional`, `min_count`, and field predicates.
 - [x] Represent terminal expectations as `success`, `error`, or `cancelled`.
-- [ ] Add sample recipes for streaming chat, non-streaming chat, invalid body, unsupported operation, usage, tool-call delta, cancellation, and backend error.
+- [x] Add sample recipes for streaming chat, non-streaming chat, invalid body, unsupported operation, usage, tool-call delta, cancellation, and backend error.
 
 ## Execution And Result Shapes
 

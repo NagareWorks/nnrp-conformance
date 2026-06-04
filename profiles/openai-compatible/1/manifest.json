@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/api-profile-suite.schema.json",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "level": 1,
+  "protocol_baselines": [
+    "nnrp-1-preview3"
+  ],
+  "recipe_manifests": [
+    "recipes/chat-streaming-text.json",
+    "recipes/chat-non-streaming.json",
+    "recipes/chat-invalid-body.json",
+    "recipes/chat-unsupported-operation.json",
+    "recipes/chat-usage.json",
+    "recipes/chat-tool-call-delta.json",
+    "recipes/chat-cancellation.json",
+    "recipes/chat-backend-error.json"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/api-profile-suite.schema.json",
+  "title": "NNRP API Profile Suite Manifest",
+  "type": "object",
+  "required": [
+    "profile",
+    "schema_version",
+    "level",
+    "protocol_baselines",
+    "recipe_manifests"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "const": "openai-compatible"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "openai-compatible/1"
+    },
+    "level": {
+      "type": "integer",
+      "const": 1
+    },
+    "protocol_baselines": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "recipe_manifests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

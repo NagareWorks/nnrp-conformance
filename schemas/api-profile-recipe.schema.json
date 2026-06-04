@@ -31,6 +31,14 @@
       "type": "string",
       "minLength": 1
     },
+    "required_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
     "status": {
       "type": "string",
       "enum": [

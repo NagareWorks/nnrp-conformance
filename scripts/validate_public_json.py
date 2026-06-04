@@ -161,6 +161,19 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
             api_profile_results_example,
         )
 
+    profile_manifest = repo_root / "profiles" / "openai-compatible" / "1" / "manifest.json"
+    if profile_manifest.exists():
+        validate_json(schema_root / "api-profile-suite.schema.json", profile_manifest)
+        profile_root = profile_manifest.parent
+        profile = load_json(profile_manifest)
+        if not isinstance(profile, dict):
+            raise SystemExit(f"api profile manifest must be a JSON object: {profile_manifest}")
+        for relative_path in profile.get("recipe_manifests", []):
+            validate_json(
+                schema_root / "api-profile-recipe.schema.json",
+                profile_root / str(relative_path),
+            )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(

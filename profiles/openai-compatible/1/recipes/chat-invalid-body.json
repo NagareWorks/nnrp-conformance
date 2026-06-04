@@ -1,0 +1,35 @@
+{
+  "$schema": "../../../../schemas/api-profile-recipe.schema.json",
+  "id": "openai-compatible.chat.invalid-body",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "operation": "chat.completions.create",
+  "required_capabilities": [
+    "api.level1",
+    "api.chat.completions.create"
+  ],
+  "status": "mandatory",
+  "parameters": {
+    "MODEL_ID": "example-model"
+  },
+  "request": {
+    "body": {
+      "model": "${MODEL_ID}",
+      "stream": false
+    }
+  },
+  "expect": {
+    "events": [
+      {
+        "type": "response.error",
+        "fields": {
+          "error": {
+            "code": "missing_messages"
+          }
+        },
+        "min_count": 1
+      }
+    ],
+    "terminal": "error"
+  }
+}

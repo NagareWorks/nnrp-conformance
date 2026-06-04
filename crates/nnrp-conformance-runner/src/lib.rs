@@ -231,9 +231,13 @@ pub fn build_api_profile_execution_plan(
 ) -> Result<ApiProfileExecutionPlan, FixtureError> {
     validate_api_profile_alignment(capability_manifest, recipes)?;
 
+    let declared_capabilities = api_profile_declared_capabilities(capability_manifest);
+    let coverage_matrix = build_api_profile_coverage_matrix(recipes, &declared_capabilities);
     let selected_cases = recipes
         .iter()
-        .filter(|recipe| recipe_is_claimed(capability_manifest, recipe))
+        .filter(|recipe| {
+            api_recipe_selection(recipe, &declared_capabilities) == CaseSelection::Selected
+        })
         .map(|recipe| ApiProfileExecutionCase {
             id: recipe.id.clone(),
             operation: recipe.operation.clone(),
@@ -253,6 +257,7 @@ pub fn build_api_profile_execution_plan(
         schema_version: capability_manifest.schema_version.clone(),
         adapter: capability_manifest.adapter.clone(),
         artifacts,
+        coverage_matrix,
         cases: selected_cases,
     })
 }
@@ -333,6 +338,7 @@ pub fn validate_api_profile_results(
                     &result.events,
                     result.id.as_str(),
                 )?;
+                validate_api_terminal_event(&result.terminal, &result.events, result.id.as_str())?;
                 summary.passed_cases += 1;
             }
             ApiProfileCaseOutcome::Failed => summary.failed_cases += 1,
@@ -350,6 +356,34 @@ pub fn validate_api_profile_results(
     }
 
     Ok(summary)
+}
+
+fn validate_api_terminal_event(
+    terminal: &nnrp_conformance_fixtures::ApiProfileTerminal,
+    events: &[nnrp_conformance_fixtures::ApiProfileObservedEvent],
+    case_id: &str,
+) -> Result<(), FixtureError> {
+    let required_event = match terminal {
+        nnrp_conformance_fixtures::ApiProfileTerminal::Success => None,
+        nnrp_conformance_fixtures::ApiProfileTerminal::Error => Some("response.error"),
+        nnrp_conformance_fixtures::ApiProfileTerminal::Cancelled => Some("response.cancelled"),
+    };
+
+    if let Some(required_event) = required_event {
+        if !events
+            .iter()
+            .any(|event| event.event_type == required_event)
+        {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "api profile case {case_id} terminal {:?} must include {required_event}",
+                    terminal
+                ),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 fn validate_api_profile_alignment(
@@ -392,49 +426,107 @@ fn validate_api_profile_alignment(
     Ok(())
 }
 
-fn recipe_is_claimed(
-    capability_manifest: &ApiProfileCapabilityManifest,
-    recipe: &ApiProfileRecipe,
-) -> bool {
-    let Some(operation) = capability_manifest
-        .operations
+fn recipe_is_claimed(declared_capabilities: &BTreeSet<String>, recipe: &ApiProfileRecipe) -> bool {
+    required_api_capabilities(recipe)
         .iter()
-        .find(|operation| operation.name == recipe.operation)
-    else {
-        return false;
-    };
+        .all(|capability| declared_capabilities.contains(capability))
+}
 
-    if recipe_requires_streaming(recipe) && !operation.streaming {
-        return false;
+fn api_recipe_selection(
+    recipe: &ApiProfileRecipe,
+    declared_capabilities: &BTreeSet<String>,
+) -> CaseSelection {
+    match recipe.status {
+        CaseStatus::Mandatory | CaseStatus::Optional => {
+            if recipe_is_claimed(declared_capabilities, recipe) {
+                CaseSelection::Selected
+            } else {
+                CaseSelection::NotClaimed
+            }
+        }
+        CaseStatus::Experimental | CaseStatus::Deprecated => CaseSelection::Informational,
     }
-    if !recipe_requires_streaming(recipe) && !operation.non_streaming {
-        return false;
+}
+
+fn api_profile_declared_capabilities(
+    capability_manifest: &ApiProfileCapabilityManifest,
+) -> BTreeSet<String> {
+    let mut capabilities = BTreeSet::new();
+    for level in &capability_manifest.compatibility_levels {
+        capabilities.insert(format!("api.level{level}"));
     }
-    if recipe_requires_tool_calls(recipe) && !operation.tool_calls {
-        return false;
+    for operation in &capability_manifest.operations {
+        capabilities.insert(format!("api.{}", operation.name));
+        if operation.streaming {
+            capabilities.insert("api.streaming".to_string());
+        }
+        if operation.non_streaming {
+            capabilities.insert("api.non_streaming".to_string());
+        }
+        if operation.tool_calls {
+            capabilities.insert("api.tool_calls".to_string());
+        }
+        if operation.cancellation {
+            capabilities.insert("api.cancellation".to_string());
+        }
     }
-    if recipe_requires_cancellation(recipe) && !operation.cancellation {
-        return false;
+    for extension in &capability_manifest.extensions {
+        capabilities.insert(format!("api.extension.{}", extension.name));
+        if extension.critical {
+            capabilities.insert(format!("api.extension.{}.critical", extension.name));
+        }
+    }
+    capabilities
+}
+
+fn build_api_profile_coverage_matrix(
+    recipes: &[ApiProfileRecipe],
+    declared_capabilities: &BTreeSet<String>,
+) -> Vec<CompatibilityMatrixEntry> {
+    let mut compatibility_matrix = BTreeMap::<String, CompatibilityMatrixAccumulator>::new();
+
+    for recipe in recipes {
+        let selection = api_recipe_selection(recipe, declared_capabilities);
+        let entry = compatibility_matrix
+            .entry(recipe.operation.clone())
+            .or_default();
+        entry
+            .required_capabilities
+            .extend(required_api_capabilities(recipe));
+        entry.case_ids.insert(recipe.id.clone());
+        match selection {
+            CaseSelection::Selected => entry.summary.selected_cases += 1,
+            CaseSelection::NotClaimed => entry.summary.not_claimed_cases += 1,
+            CaseSelection::Informational => entry.summary.informational_cases += 1,
+        }
+        match recipe.status {
+            CaseStatus::Mandatory => entry.statuses.mandatory_cases += 1,
+            CaseStatus::Optional => entry.statuses.optional_cases += 1,
+            CaseStatus::Experimental => entry.statuses.experimental_cases += 1,
+            CaseStatus::Deprecated => entry.statuses.deprecated_cases += 1,
+        }
     }
 
-    recipe
-        .request
-        .nnrp
-        .as_ref()
-        .and_then(|nnrp| nnrp.get("extensions"))
-        .and_then(|extensions| extensions.as_array())
+    compatibility_matrix
         .into_iter()
-        .flatten()
-        .filter_map(|extension| extension.as_str())
-        .all(|extension| {
-            capability_manifest
-                .extensions
-                .iter()
-                .any(|declared| declared.name == extension)
+        .map(|(feature, entry)| CompatibilityMatrixEntry {
+            feature,
+            required_capabilities: entry.required_capabilities.into_iter().collect(),
+            summary: entry.summary,
+            statuses: entry.statuses,
+            case_ids: entry.case_ids.into_iter().collect(),
         })
+        .collect()
 }
 
 fn required_api_capabilities(recipe: &ApiProfileRecipe) -> Vec<String> {
+    if !recipe.required_capabilities.is_empty() {
+        let mut capabilities = recipe.required_capabilities.clone();
+        capabilities.sort();
+        capabilities.dedup();
+        return capabilities;
+    }
+
     let mut capabilities = vec![format!("api.{}", recipe.operation)];
     capabilities.push(
         if recipe_requires_streaming(recipe) {
@@ -569,7 +661,7 @@ fn validate_expected_api_event_fields(
                 ),
             });
         };
-        if actual_value != expected_value {
+        if !json_contains(actual_value, expected_value) {
             return Err(FixtureError::Validation {
                 message: format!(
                     "api profile case {case_id} event {} field {field} mismatch",
@@ -580,6 +672,28 @@ fn validate_expected_api_event_fields(
     }
 
     Ok(())
+}
+
+fn json_contains(actual: &serde_json::Value, expected: &serde_json::Value) -> bool {
+    match (actual, expected) {
+        (serde_json::Value::Object(actual), serde_json::Value::Object(expected)) => {
+            expected.iter().all(|(key, expected_value)| {
+                actual
+                    .get(key)
+                    .is_some_and(|actual_value| json_contains(actual_value, expected_value))
+            })
+        }
+        (serde_json::Value::Array(actual), serde_json::Value::Array(expected)) => {
+            expected.len() <= actual.len()
+                && expected
+                    .iter()
+                    .zip(actual.iter())
+                    .all(|(expected_value, actual_value)| {
+                        json_contains(actual_value, expected_value)
+                    })
+        }
+        _ => actual == expected,
+    }
 }
 
 fn default_benchmark_scenarios(supports: &[String]) -> Vec<BenchmarkScenario> {
@@ -1422,6 +1536,7 @@ mod tests {
             profile: "openai-compatible".to_string(),
             schema_version: "openai-compatible/1".to_string(),
             operation: "chat.completions.create".to_string(),
+            required_capabilities: vec![],
             status: CaseStatus::Mandatory,
             parameters: BTreeMap::new(),
             request: ApiProfileRecipeRequest {
@@ -1487,6 +1602,55 @@ mod tests {
                     .required_capabilities
                     .contains(&"api.non_streaming".to_string())
         }));
+        assert_eq!(plan.coverage_matrix.len(), 1);
+        assert_eq!(plan.coverage_matrix[0].summary.selected_cases, 2);
+        assert_eq!(plan.coverage_matrix[0].summary.not_claimed_cases, 1);
+    }
+
+    #[test]
+    fn api_profile_plan_builds_from_frozen_openai_recipe_catalog() {
+        let profile_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("profiles")
+            .join("openai-compatible")
+            .join("1");
+        let manifest: nnrp_conformance_fixtures::ApiProfileSuiteManifest =
+            load_json_file(profile_root.join("manifest.json"))
+                .expect("api profile manifest should load");
+        let recipes = manifest
+            .recipe_manifests
+            .iter()
+            .map(|recipe_path| {
+                load_json_file::<ApiProfileRecipe>(profile_root.join(recipe_path))
+                    .unwrap_or_else(|error| panic!("recipe {recipe_path} should load: {error}"))
+            })
+            .collect::<Vec<_>>();
+        let mut capabilities = sample_api_capabilities();
+        capabilities.operations[0].tool_calls = true;
+
+        let plan = build_api_profile_execution_plan(
+            &capabilities,
+            &recipes,
+            AdapterArtifactContext {
+                results_path: "artifacts/api-profile-results.json".to_string(),
+                evidence_dir: "artifacts/api-profile-evidence".to_string(),
+            },
+        )
+        .expect("api profile plan should build from frozen catalog");
+
+        assert_eq!(recipes.len(), 8);
+        assert_eq!(plan.cases.len(), 7);
+        assert!(
+            plan.cases
+                .iter()
+                .any(|case| case.id == "openai-compatible.chat.unsupported-operation")
+        );
+        assert!(
+            plan.coverage_matrix
+                .iter()
+                .any(|entry| entry.summary.not_claimed_cases == 1)
+        );
     }
 
     #[test]

@@ -259,6 +259,17 @@ pub struct ApiProfileCapabilityManifest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiProfileSuiteManifest {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub profile: String,
+    pub schema_version: String,
+    pub level: u32,
+    pub protocol_baselines: Vec<String>,
+    pub recipe_manifests: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiProfileOperationCapability {
     pub name: String,
     pub streaming: bool,
@@ -284,6 +295,8 @@ pub struct ApiProfileRecipe {
     pub profile: String,
     pub schema_version: String,
     pub operation: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub required_capabilities: Vec<String>,
     #[serde(default = "mandatory_case_status")]
     pub status: CaseStatus,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -325,6 +338,7 @@ pub struct ApiProfileExecutionPlan {
     pub schema_version: String,
     pub adapter: String,
     pub artifacts: AdapterArtifactContext,
+    pub coverage_matrix: Vec<CompatibilityMatrixEntry>,
     pub cases: Vec<ApiProfileExecutionCase>,
 }
 
@@ -520,8 +534,8 @@ mod tests {
     use super::{
         AdapterCaseResultReport, AdapterExecutionPlan, ApiProfileCapabilityManifest,
         ApiProfileCaseResultReport, ApiProfileExecutionPlan, ApiProfileRecipe,
-        BenchmarkExecutionPlan, BenchmarkResultReport, CapabilityManifest, CaseManifest,
-        CaseStatus, ProtocolManifest, SemanticVectorManifest, build_vector_manifest,
+        ApiProfileSuiteManifest, BenchmarkExecutionPlan, BenchmarkResultReport, CapabilityManifest,
+        CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest, build_vector_manifest,
         load_json_file, validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
@@ -746,6 +760,35 @@ mod tests {
             recipe.expect.events[0].event_type,
             "response.output_text.delta"
         );
+    }
+
+    #[test]
+    fn loads_openai_api_profile_suite_manifest_and_recipes() {
+        let profile_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("profiles")
+            .join("openai-compatible")
+            .join("1");
+        let manifest: ApiProfileSuiteManifest = load_json_file(profile_root.join("manifest.json"))
+            .expect("api profile suite manifest should load");
+
+        assert_eq!(manifest.profile, "openai-compatible");
+        assert_eq!(manifest.schema_version, "openai-compatible/1");
+        assert_eq!(manifest.recipe_manifests.len(), 8);
+
+        for recipe_path in &manifest.recipe_manifests {
+            let recipe: ApiProfileRecipe = load_json_file(profile_root.join(recipe_path))
+                .unwrap_or_else(|error| {
+                    panic!("api profile recipe {recipe_path} should load: {error}")
+                });
+            assert_eq!(recipe.profile, manifest.profile);
+            assert_eq!(recipe.schema_version, manifest.schema_version);
+            assert!(
+                !recipe.required_capabilities.is_empty(),
+                "api profile recipe {recipe_path} must declare selection capabilities"
+            );
+        }
     }
 
     #[test]

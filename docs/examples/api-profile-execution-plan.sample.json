@@ -7,13 +7,39 @@
     "results_path": "artifacts/api-profile-results.json",
     "evidence_dir": "artifacts/api-profile-evidence"
   },
+  "coverage_matrix": [
+    {
+      "feature": "chat.completions.create",
+      "required_capabilities": [
+        "api.level1",
+        "api.chat.completions.create",
+        "api.streaming"
+      ],
+      "summary": {
+        "selected_cases": 1,
+        "not_claimed_cases": 0,
+        "informational_cases": 0
+      },
+      "statuses": {
+        "mandatory_cases": 1,
+        "optional_cases": 0,
+        "experimental_cases": 0,
+        "deprecated_cases": 0
+      },
+      "case_ids": [
+        "openai-compatible.chat.streaming-text"
+      ]
+    }
+  ],
   "cases": [
     {
       "id": "openai-compatible.chat.streaming-text",
       "operation": "chat.completions.create",
       "status": "mandatory",
       "required_capabilities": [
-        "openai-compatible.level1.chat.streaming"
+        "api.level1",
+        "api.chat.completions.create",
+        "api.streaming"
       ],
       "request": {
         "body": {

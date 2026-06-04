@@ -1,0 +1,41 @@
+{
+  "$schema": "../../../../schemas/api-profile-recipe.schema.json",
+  "id": "openai-compatible.chat.backend-error",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "operation": "chat.completions.create",
+  "required_capabilities": [
+    "api.level1",
+    "api.chat.completions.create"
+  ],
+  "status": "mandatory",
+  "parameters": {
+    "MODEL_ID": "backend-error"
+  },
+  "request": {
+    "body": {
+      "model": "${MODEL_ID}",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Trigger backend error."
+        }
+      ],
+      "stream": false
+    }
+  },
+  "expect": {
+    "events": [
+      {
+        "type": "response.error",
+        "fields": {
+          "error": {
+            "code": "backend_error"
+          }
+        },
+        "min_count": 1
+      }
+    ],
+    "terminal": "error"
+  }
+}

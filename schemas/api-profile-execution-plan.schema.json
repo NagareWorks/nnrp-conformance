@@ -8,6 +8,7 @@
     "schema_version",
     "adapter",
     "artifacts",
+    "coverage_matrix",
     "cases"
   ],
   "properties": {
@@ -41,6 +42,46 @@
         }
       },
       "additionalProperties": false
+    },
+    "coverage_matrix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "feature",
+          "required_capabilities",
+          "summary",
+          "statuses",
+          "case_ids"
+        ],
+        "properties": {
+          "feature": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "summary": {
+            "$ref": "#/$defs/summary"
+          },
+          "statuses": {
+            "$ref": "#/$defs/statuses"
+          },
+          "case_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "cases": {
       "type": "array",
@@ -84,6 +125,59 @@
         },
         "additionalProperties": false
       }
+    }
+  },
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": [
+        "selected_cases",
+        "not_claimed_cases",
+        "informational_cases"
+      ],
+      "properties": {
+        "selected_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_claimed_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "informational_cases": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "statuses": {
+      "type": "object",
+      "required": [
+        "mandatory_cases",
+        "optional_cases",
+        "experimental_cases",
+        "deprecated_cases"
+      ],
+      "properties": {
+        "mandatory_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "optional_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "experimental_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deprecated_cases": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

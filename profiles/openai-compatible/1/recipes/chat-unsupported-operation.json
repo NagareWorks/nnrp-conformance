@@ -1,0 +1,31 @@
+{
+  "$schema": "../../../../schemas/api-profile-recipe.schema.json",
+  "id": "openai-compatible.chat.unsupported-operation",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "operation": "responses.create",
+  "required_capabilities": [
+    "api.level1"
+  ],
+  "status": "mandatory",
+  "request": {
+    "body": {
+      "model": "example-model",
+      "input": "Say hello."
+    }
+  },
+  "expect": {
+    "events": [
+      {
+        "type": "response.error",
+        "fields": {
+          "error": {
+            "code": "unsupported_operation"
+          }
+        },
+        "min_count": 1
+      }
+    ],
+    "terminal": "error"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "../../../../schemas/api-profile-recipe.schema.json",
+  "id": "openai-compatible.chat.tool-call-delta",
+  "profile": "openai-compatible",
+  "schema_version": "openai-compatible/1",
+  "operation": "chat.completions.create",
+  "required_capabilities": [
+    "api.level1",
+    "api.chat.completions.create",
+    "api.streaming",
+    "api.tool_calls"
+  ],
+  "status": "optional",
+  "parameters": {
+    "MODEL_ID": "example-model"
+  },
+  "request": {
+    "body": {
+      "model": "${MODEL_ID}",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Call the lookup tool."
+        }
+      ],
+      "stream": true,
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "lookup",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      ]
+    }
+  },
+  "expect": {
+    "events": [
+      {
+        "type": "response.tool_call.delta",
+        "min_count": 1
+      }
+    ],
+    "terminal": "success"
+  }
+}
