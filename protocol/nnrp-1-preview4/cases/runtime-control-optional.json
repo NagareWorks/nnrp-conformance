@@ -17,9 +17,9 @@
       "id": "l1.control.cache-reference",
       "layer": "L1",
       "status": "optional",
-      "feature": "control.cache_reference",
+      "feature": "cache.reference",
       "required_capabilities": [
-        "control.cache_reference"
+        "cache.reference"
       ],
       "description": "Use cache references, misses, and invalidation only where identity and invalidation are well-defined."
     },

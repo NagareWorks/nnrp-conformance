@@ -39,7 +39,7 @@
       "control.credit_backpressure",
       "control.capability_costs",
       "control.route_execution_hint",
-      "control.cache_reference",
+      "cache.reference",
       "control.trace_context",
       "control.result_drop_reason",
       "control.degrade_profile",

@@ -145,7 +145,7 @@
       "required_capabilities": [
         "control.capability_costs",
         "control.route_execution_hint",
-        "control.cache_reference",
+        "cache.reference",
         "control.degrade_profile",
         "control.budget_update"
       ],
