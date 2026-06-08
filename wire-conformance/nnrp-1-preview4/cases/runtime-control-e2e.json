@@ -188,6 +188,98 @@
           "CACHE_MISS"
         ]
       }
+    },
+    {
+      "id": "wire.control.cancel-abort.ipc-client",
+      "mode": "suite_as_client",
+      "transport": "ipc",
+      "status": "experimental",
+      "feature": "control.cancel_abort",
+      "required_capabilities": [
+        "control.cancel_abort",
+        "control.result_drop_reason",
+        "control.trace_context"
+      ],
+      "description": "Runner submits an operation over the Rust IPC transport, sends CANCEL, and verifies cooperative termination or a typed drop reason without falling back to an SDK adapter.",
+      "steps": [
+        {
+          "action": "send",
+          "frame": "REQUEST",
+          "payload": {
+            "operation_id": "op-ipc-cancel-1"
+          }
+        },
+        {
+          "action": "send",
+          "frame": "CANCEL",
+          "payload": {
+            "operation_id": "op-ipc-cancel-1",
+            "reason": "deadline_changed"
+          }
+        },
+        {
+          "action": "receive",
+          "frame": "RESULT_DROP_REASON",
+          "timeout_ms": 1000
+        }
+      ],
+      "expect": {
+        "terminal": "cancelled",
+        "frames": [
+          "TRACE_CONTEXT",
+          "RESULT_DROP_REASON"
+        ]
+      }
+    },
+    {
+      "id": "wire.control.progress-backpressure.websocket-server",
+      "mode": "suite_as_server",
+      "transport": "websocket",
+      "status": "experimental",
+      "feature": "control.progress_backpressure",
+      "required_capabilities": [
+        "control.progress_partial",
+        "control.credit_backpressure",
+        "object.lifecycle"
+      ],
+      "description": "Runner accepts a WebSocket transport request, emits PROGRESS and PARTIAL_RESULT frames, constrains credits, and verifies the client honors backpressure without using a transport-local JSON shim.",
+      "steps": [
+        {
+          "action": "receive",
+          "frame": "REQUEST",
+          "timeout_ms": 1000
+        },
+        {
+          "action": "send",
+          "frame": "PROGRESS",
+          "payload": {
+            "stage": "tool_call",
+            "percent": 50
+          }
+        },
+        {
+          "action": "send",
+          "frame": "CREDIT_UPDATE",
+          "payload": {
+            "max_in_flight": 1
+          }
+        },
+        {
+          "action": "send",
+          "frame": "PARTIAL_RESULT",
+          "payload": {
+            "object_id": "ws-partial-1"
+          }
+        }
+      ],
+      "expect": {
+        "terminal": "success",
+        "frames": [
+          "PROGRESS",
+          "CREDIT_UPDATE",
+          "PARTIAL_RESULT"
+        ]
+      }
     }
   ]
 }

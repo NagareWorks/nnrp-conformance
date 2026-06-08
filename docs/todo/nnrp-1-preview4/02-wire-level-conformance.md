@@ -12,7 +12,9 @@ NNRP frames directly.
 - [x] Add a target manifest schema for live endpoints.
 - [x] Add an execution-plan schema for suite-owned wire plans.
 - [x] Add a case-results schema for observed frame reports.
-- [ ] Implement the runner that can drive TCP and QUIC endpoints directly.
+- [x] Freeze TCP, QUIC, IPC, and WebSocket as preview4 wire target transports.
+- [x] Add IPC and WebSocket scenario coverage so they are selectable by target manifests.
+- [ ] Implement the runner that can drive TCP, QUIC, IPC, and WebSocket endpoints directly.
 - [ ] Add timeout, close, backpressure, and frame-order injection in proxy mode.
 - [ ] Add CI examples that run against a local reference endpoint.
 

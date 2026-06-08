@@ -701,8 +701,8 @@ mod tests {
         CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest,
         WireConformanceCaseResultReport, WireConformanceExecutionPlan,
         WireConformanceScenarioManifest, WireConformanceSuiteManifest,
-        WireConformanceTargetManifest, build_vector_manifest, load_json_file,
-        validate_protocol_alignment, verify_vector_manifest,
+        WireConformanceTargetManifest, WireConformanceTransport, build_vector_manifest,
+        load_json_file, validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -1038,7 +1038,17 @@ mod tests {
         .expect("wire conformance target example should load");
 
         assert_eq!(manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(manifest.wire_conformance.transports.len(), 2);
+        let transport_names = manifest
+            .wire_conformance
+            .transports
+            .iter()
+            .map(|transport| transport.name)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(manifest.wire_conformance.transports.len(), 4);
+        assert!(transport_names.contains(&WireConformanceTransport::Tcp));
+        assert!(transport_names.contains(&WireConformanceTransport::Quic));
+        assert!(transport_names.contains(&WireConformanceTransport::Ipc));
+        assert!(transport_names.contains(&WireConformanceTransport::Websocket));
         assert!(
             manifest
                 .wire_conformance

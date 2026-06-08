@@ -19,6 +19,16 @@
         "name": "quic",
         "endpoint": "127.0.0.1:19092",
         "tls": false
+      },
+      {
+        "name": "ipc",
+        "endpoint": "npipe://nnrp-preview4-sample",
+        "tls": false
+      },
+      {
+        "name": "websocket",
+        "endpoint": "ws://127.0.0.1:19093/nnrp",
+        "tls": false
       }
     ],
     "capabilities": [
