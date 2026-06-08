@@ -448,7 +448,7 @@ pub struct WireConformanceTransportEndpoint {
     pub tls: bool,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WireConformanceMode {
     SuiteAsClient,
@@ -456,7 +456,7 @@ pub enum WireConformanceMode {
     SuiteAsProxy,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WireConformanceTransport {
     Tcp,
@@ -1079,7 +1079,7 @@ mod tests {
 
         assert_eq!(report.protocol_version, "nnrp-1-preview4");
         assert_eq!(report.results.len(), 1);
-        assert_eq!(report.results[0].observed_frames.len(), 2);
+        assert_eq!(report.results[0].observed_frames.len(), 3);
     }
 
     #[test]

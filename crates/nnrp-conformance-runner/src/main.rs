@@ -5,17 +5,20 @@ use nnrp_conformance_fixtures::{
     ApiProfileCapabilityManifest, ApiProfileCaseResultReport, ApiProfileExecutionPlan,
     ApiProfileRecipe, ApiProfileSuiteManifest, BenchmarkArtifactContext, BenchmarkExecutionPlan,
     BenchmarkOutcome, BenchmarkResultReport, CapabilityManifest, CaseManifest, ProtocolManifest,
-    SemanticVectorManifest, VectorManifest, build_vector_manifest, load_json_file,
-    verify_vector_manifest,
+    SemanticVectorManifest, VectorManifest, WireConformanceCaseResultReport,
+    WireConformanceExecutionPlan, WireConformanceScenario, WireConformanceScenarioManifest,
+    WireConformanceSuiteManifest, WireConformanceTargetManifest, build_vector_manifest,
+    load_json_file, verify_vector_manifest,
 };
 use nnrp_conformance_runner::{
     build_adapter_execution_plan, build_adapter_execution_plan_for_manifests,
     build_api_profile_execution_plan, build_benchmark_execution_plan, build_execution_plan,
-    build_execution_plan_for_manifests, validate_api_profile_results,
+    build_execution_plan_for_manifests, build_wire_conformance_execution_plan,
+    validate_api_profile_results, validate_wire_conformance_results,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Parser)]
 #[command(name = "nnrp-conformance-runner")]
@@ -81,6 +84,20 @@ enum Command {
         #[arg(long, default_value = "artifacts/api-profile-evidence")]
         evidence_dir: PathBuf,
     },
+    WirePlan {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        scenarios: Vec<PathBuf>,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long, default_value = "artifacts/wire-results.json")]
+        results_path: PathBuf,
+        #[arg(long, default_value = "artifacts/wire-evidence")]
+        evidence_dir: PathBuf,
+    },
     GenerateVectors {
         #[arg(long)]
         recipe: PathBuf,
@@ -112,6 +129,12 @@ enum Command {
         results: PathBuf,
     },
     ValidateApiProfileResults {
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        results: PathBuf,
+    },
+    ValidateWireResults {
         #[arg(long)]
         plan: PathBuf,
         #[arg(long)]
@@ -172,7 +195,7 @@ fn main() -> Result<()> {
             };
             let rendered = format!("{}\n", serde_json::to_string_pretty(&summary)?);
             if let Some(output_path) = output {
-                std::fs::write(output_path, rendered)?;
+                write_text_output(&output_path, &rendered)?;
             } else {
                 print!("{rendered}");
             }
@@ -229,9 +252,9 @@ fn main() -> Result<()> {
                     artifacts,
                 )?
             };
-            std::fs::write(
-                output,
-                format!("{}\n", serde_json::to_string_pretty(&plan)?),
+            write_text_output(
+                &output,
+                &format!("{}\n", serde_json::to_string_pretty(&plan)?),
             )?;
         }
         Command::BenchmarkPlan {
@@ -255,9 +278,9 @@ fn main() -> Result<()> {
             };
             let plan =
                 build_benchmark_execution_plan(&protocol_manifest, &capability_manifest, artifacts);
-            std::fs::write(
-                output,
-                format!("{}\n", serde_json::to_string_pretty(&plan)?),
+            write_text_output(
+                &output,
+                &format!("{}\n", serde_json::to_string_pretty(&plan)?),
             )?;
         }
         Command::ApiProfilePlan {
@@ -288,9 +311,49 @@ fn main() -> Result<()> {
                 &recipe_manifests,
                 artifacts,
             )?;
-            std::fs::write(
-                output,
-                format!("{}\n", serde_json::to_string_pretty(&plan)?),
+            write_text_output(
+                &output,
+                &format!("{}\n", serde_json::to_string_pretty(&plan)?),
+            )?;
+        }
+        Command::WirePlan {
+            suite,
+            target,
+            scenarios,
+            output,
+            results_path,
+            evidence_dir,
+        } => {
+            let suite_manifest: WireConformanceSuiteManifest = load_json_file(&suite)?;
+            let target_manifest: WireConformanceTargetManifest = load_json_file(&target)?;
+            anyhow::ensure!(
+                suite_manifest.protocol_version == target_manifest.protocol_version,
+                "wire target protocol version mismatch: expected {}, got {}",
+                suite_manifest.protocol_version,
+                target_manifest.protocol_version
+            );
+            anyhow::ensure!(
+                suite_manifest.suite_version == target_manifest.suite_version,
+                "wire target suite version mismatch: expected {}, got {}",
+                suite_manifest.suite_version,
+                target_manifest.suite_version
+            );
+
+            let scenario_paths = wire_scenario_paths(&suite, &suite_manifest, scenarios);
+            let scenario_manifests = scenario_paths
+                .iter()
+                .map(load_json_file::<WireConformanceScenarioManifest>)
+                .collect::<Result<Vec<_>, _>>()?;
+            let scenarios = load_wire_scenarios(&suite_manifest, &scenario_manifests)?;
+            let artifacts = AdapterArtifactContext {
+                results_path: results_path.display().to_string(),
+                evidence_dir: evidence_dir.display().to_string(),
+            };
+            let plan =
+                build_wire_conformance_execution_plan(&target_manifest, &scenarios, artifacts)?;
+            write_text_output(
+                &output,
+                &format!("{}\n", serde_json::to_string_pretty(&plan)?),
             )?;
         }
         Command::GenerateVectors { recipe, output } => {
@@ -301,9 +364,9 @@ fn main() -> Result<()> {
                 .map(|name| format!("vectors/{name}"))
                 .unwrap_or_else(|| recipe.display().to_string());
             let vector_manifest = build_vector_manifest(&semantic_manifest, &generated_from)?;
-            std::fs::write(
+            write_text_output(
                 &output,
-                format!("{}\n", serde_json::to_string_pretty(&vector_manifest)?),
+                &format!("{}\n", serde_json::to_string_pretty(&vector_manifest)?),
             )?;
         }
         Command::VerifyVectors { recipe, manifest } => {
@@ -339,9 +402,60 @@ fn main() -> Result<()> {
             let summary = validate_api_profile_results(&api_plan, &api_results)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
+        Command::ValidateWireResults { plan, results } => {
+            let wire_plan: WireConformanceExecutionPlan = load_json_file(&plan)?;
+            let wire_results: WireConformanceCaseResultReport = load_json_file(&results)?;
+            let summary = validate_wire_conformance_results(&wire_plan, &wire_results)?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
     }
 
     Ok(())
+}
+
+fn write_text_output(path: &Path, contents: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    std::fs::write(path, contents)?;
+    Ok(())
+}
+
+fn wire_scenario_paths(
+    suite_path: &Path,
+    suite_manifest: &WireConformanceSuiteManifest,
+    explicit_scenarios: Vec<PathBuf>,
+) -> Vec<PathBuf> {
+    if !explicit_scenarios.is_empty() {
+        return explicit_scenarios;
+    }
+
+    let suite_root = suite_path.parent().unwrap_or(std::path::Path::new("."));
+    suite_manifest
+        .scenario_manifests
+        .iter()
+        .map(|relative_path| suite_root.join(relative_path))
+        .collect()
+}
+
+fn load_wire_scenarios(
+    suite_manifest: &WireConformanceSuiteManifest,
+    scenario_manifests: &[WireConformanceScenarioManifest],
+) -> Result<Vec<WireConformanceScenario>> {
+    let mut scenarios = Vec::new();
+    for scenario_manifest in scenario_manifests {
+        anyhow::ensure!(
+            scenario_manifest.protocol_version == suite_manifest.protocol_version,
+            "wire scenario manifest {} protocol version mismatch: expected {}, got {}",
+            scenario_manifest.manifest_name,
+            suite_manifest.protocol_version,
+            scenario_manifest.protocol_version
+        );
+        scenarios.extend(scenario_manifest.scenarios.iter().cloned());
+    }
+    Ok(scenarios)
 }
 
 fn api_profile_recipe_paths(

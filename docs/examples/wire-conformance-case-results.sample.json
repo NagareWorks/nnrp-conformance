@@ -19,6 +19,15 @@
         },
         {
           "direction": "received",
+          "frame": "TRACE_CONTEXT",
+          "payload": {
+            "trace_id": "trace-cancel-1",
+            "span_id": "span-drop-reason"
+          },
+          "timestamp_us": 1300
+        },
+        {
+          "direction": "received",
           "frame": "RESULT_DROP_REASON",
           "payload": {
             "reason": "superseded"
