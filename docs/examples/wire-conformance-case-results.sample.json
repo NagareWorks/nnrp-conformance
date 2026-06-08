@@ -1,0 +1,34 @@
+{
+  "$schema": "../../schemas/wire-conformance-case-results.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "suite_version": "0.1.0",
+  "target_name": "sample-preview4-target",
+  "results": [
+    {
+      "id": "wire.control.cancel-abort.client",
+      "outcome": "passed",
+      "terminal": "cancelled",
+      "observed_frames": [
+        {
+          "direction": "sent",
+          "frame": "CANCEL",
+          "payload": {
+            "operation_id": "op-cancel-1"
+          },
+          "timestamp_us": 1200
+        },
+        {
+          "direction": "received",
+          "frame": "RESULT_DROP_REASON",
+          "payload": {
+            "reason": "superseded"
+          },
+          "timestamp_us": 1400
+        }
+      ],
+      "evidence_paths": [
+        "artifacts/wire-evidence/cancel-abort.jsonl"
+      ]
+    }
+  ]
+}

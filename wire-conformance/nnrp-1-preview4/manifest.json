@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/wire-conformance-suite.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "suite_version": "0.1.0",
+  "status": "frozen",
+  "modes": [
+    "suite_as_client",
+    "suite_as_server",
+    "suite_as_proxy"
+  ],
+  "transports": [
+    "tcp",
+    "quic",
+    "websocket",
+    "ipc"
+  ],
+  "scenario_manifests": [
+    "cases/runtime-control-e2e.json"
+  ],
+  "target_schema": "../../schemas/wire-conformance-target.schema.json",
+  "execution_plan_schema": "../../schemas/wire-conformance-execution-plan.schema.json",
+  "case_results_schema": "../../schemas/wire-conformance-case-results.schema.json"
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-scenario.schema.json",
+  "title": "NNRP Wire-level Conformance Scenario Manifest",
+  "type": "object",
+  "required": ["protocol_version", "manifest_name", "scenarios"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string",
+      "const": "nnrp-1-preview4"
+    },
+    "manifest_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "mode",
+          "transport",
+          "status",
+          "feature",
+          "required_capabilities",
+          "description",
+          "steps",
+          "expect"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["suite_as_client", "suite_as_server", "suite_as_proxy"]
+          },
+          "transport": {
+            "type": "string",
+            "enum": ["tcp", "quic", "websocket", "ipc"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["mandatory", "optional", "experimental", "deprecated"]
+          },
+          "feature": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["action"],
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "frame": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "payload": {
+                  "type": "object"
+                },
+                "timeout_ms": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "expect": {
+            "type": "object",
+            "required": ["terminal"],
+            "properties": {
+              "terminal": {
+                "type": "string",
+                "enum": ["success", "cancelled", "dropped", "error"]
+              },
+              "frames": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}

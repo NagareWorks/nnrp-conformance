@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-suite.schema.json",
+  "title": "NNRP Wire-level Conformance Suite Manifest",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "suite_version",
+    "status",
+    "modes",
+    "transports",
+    "scenario_manifests",
+    "target_schema",
+    "execution_plan_schema",
+    "case_results_schema"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string",
+      "const": "nnrp-1-preview4"
+    },
+    "suite_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "frozen", "deprecated"]
+    },
+    "modes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mode"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "transports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transport"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "scenario_manifests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "target_schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_plan_schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_results_schema": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "mode": {
+      "type": "string",
+      "enum": ["suite_as_client", "suite_as_server", "suite_as_proxy"]
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["tcp", "quic", "websocket", "ipc"]
+    }
+  },
+  "additionalProperties": false
+}

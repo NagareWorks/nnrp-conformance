@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-execution-plan.schema.json",
+  "title": "NNRP Wire-level Conformance Execution Plan",
+  "type": "object",
+  "required": ["protocol_version", "suite_version", "target_name", "artifacts", "scenarios"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string",
+      "const": "nnrp-1-preview4"
+    },
+    "suite_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["results_path", "evidence_dir"],
+      "properties": {
+        "results_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_dir": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "$ref": "wire-conformance-scenario.schema.json#/properties/scenarios/items"
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}

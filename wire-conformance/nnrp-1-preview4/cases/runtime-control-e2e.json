@@ -1,0 +1,193 @@
+{
+  "$schema": "../../../schemas/wire-conformance-scenario.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "runtime-control-e2e",
+  "scenarios": [
+    {
+      "id": "wire.control.cancel-abort.client",
+      "mode": "suite_as_client",
+      "transport": "tcp",
+      "status": "experimental",
+      "feature": "control.cancel_abort",
+      "required_capabilities": [
+        "control.cancel_abort",
+        "control.result_drop_reason",
+        "control.trace_context"
+      ],
+      "description": "Runner submits an operation, sends CANCEL, and verifies cooperative termination or a typed drop reason over the wire.",
+      "steps": [
+        {
+          "action": "send",
+          "frame": "REQUEST",
+          "payload": {
+            "operation_id": "op-cancel-1"
+          }
+        },
+        {
+          "action": "send",
+          "frame": "CANCEL",
+          "payload": {
+            "operation_id": "op-cancel-1",
+            "reason": "superseded"
+          }
+        },
+        {
+          "action": "receive",
+          "frame": "RESULT_DROP_REASON",
+          "timeout_ms": 1000
+        }
+      ],
+      "expect": {
+        "terminal": "cancelled",
+        "frames": [
+          "TRACE_CONTEXT",
+          "RESULT_DROP_REASON"
+        ]
+      }
+    },
+    {
+      "id": "wire.control.priority-deadline.proxy",
+      "mode": "suite_as_proxy",
+      "transport": "quic",
+      "status": "experimental",
+      "feature": "control.priority_deadline",
+      "required_capabilities": [
+        "control.priority_update",
+        "control.deadline_expire",
+        "control.result_drop_reason"
+      ],
+      "description": "Runner proxies an admitted operation, injects a priority update and deadline expiry, and verifies stale work is dropped instead of completed late.",
+      "steps": [
+        {
+          "action": "forward",
+          "frame": "REQUEST"
+        },
+        {
+          "action": "inject",
+          "frame": "PRIORITY_UPDATE",
+          "payload": {
+            "operation_id": "op-priority-1",
+            "priority": 10
+          }
+        },
+        {
+          "action": "inject",
+          "frame": "EXPIRE_AT",
+          "payload": {
+            "operation_id": "op-priority-1",
+            "unix_ms": 0
+          }
+        }
+      ],
+      "expect": {
+        "terminal": "dropped",
+        "frames": [
+          "RESULT_DROP_REASON"
+        ]
+      }
+    },
+    {
+      "id": "wire.control.progress-backpressure.server",
+      "mode": "suite_as_server",
+      "transport": "tcp",
+      "status": "experimental",
+      "feature": "control.progress_backpressure",
+      "required_capabilities": [
+        "control.progress_partial",
+        "control.credit_backpressure",
+        "object.lifecycle"
+      ],
+      "description": "Runner accepts a client request, emits PROGRESS and PARTIAL_RESULT, constrains credits, and verifies the client respects backpressure.",
+      "steps": [
+        {
+          "action": "receive",
+          "frame": "REQUEST",
+          "timeout_ms": 1000
+        },
+        {
+          "action": "send",
+          "frame": "PROGRESS",
+          "payload": {
+            "stage": "prefill",
+            "percent": 25
+          }
+        },
+        {
+          "action": "send",
+          "frame": "CREDIT_UPDATE",
+          "payload": {
+            "max_in_flight": 1
+          }
+        },
+        {
+          "action": "send",
+          "frame": "PARTIAL_RESULT",
+          "payload": {
+            "object_id": "partial-1"
+          }
+        }
+      ],
+      "expect": {
+        "terminal": "success",
+        "frames": [
+          "PROGRESS",
+          "CREDIT_UPDATE",
+          "PARTIAL_RESULT"
+        ]
+      }
+    },
+    {
+      "id": "wire.control.capability-route-cache.client",
+      "mode": "suite_as_client",
+      "transport": "quic",
+      "status": "experimental",
+      "feature": "control.capability_route_cache",
+      "required_capabilities": [
+        "control.capability_costs",
+        "control.route_execution_hint",
+        "control.cache_reference",
+        "control.degrade_profile",
+        "control.budget_update"
+      ],
+      "description": "Runner negotiates costs, sends route and execution hints, references cache state, and verifies downgrade or cache miss behavior is explicit.",
+      "steps": [
+        {
+          "action": "send",
+          "frame": "CAPABILITY_NEGOTIATION",
+          "payload": {
+            "preferred_profiles": [
+              "coding.agent",
+              "runtime.object"
+            ]
+          }
+        },
+        {
+          "action": "send",
+          "frame": "ROUTE_HINT",
+          "payload": {
+            "target": "local-subagent"
+          }
+        },
+        {
+          "action": "send",
+          "frame": "CACHE_REFERENCE",
+          "payload": {
+            "cache_key": "ctx-1"
+          }
+        },
+        {
+          "action": "receive",
+          "frame": "CACHE_MISS",
+          "timeout_ms": 1000
+        }
+      ],
+      "expect": {
+        "terminal": "success",
+        "frames": [
+          "CAPABILITY_NEGOTIATION",
+          "CACHE_MISS"
+        ]
+      }
+    }
+  ]
+}

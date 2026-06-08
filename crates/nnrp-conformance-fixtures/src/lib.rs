@@ -399,6 +399,169 @@ pub enum ApiProfileCaseOutcome {
     Skipped,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceSuiteManifest {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub suite_version: String,
+    pub status: String,
+    pub modes: Vec<WireConformanceMode>,
+    pub transports: Vec<WireConformanceTransport>,
+    pub scenario_manifests: Vec<String>,
+    pub target_schema: String,
+    pub execution_plan_schema: String,
+    pub case_results_schema: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceScenarioManifest {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub manifest_name: String,
+    pub scenarios: Vec<WireConformanceScenario>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceTargetManifest {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub target_name: String,
+    pub protocol_version: String,
+    pub suite_version: String,
+    pub wire_conformance: WireConformanceTarget,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceTarget {
+    pub modes: Vec<WireConformanceMode>,
+    pub transports: Vec<WireConformanceTransportEndpoint>,
+    pub capabilities: Vec<String>,
+    pub limits: WireConformanceLimits,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceTransportEndpoint {
+    pub name: WireConformanceTransport,
+    pub endpoint: String,
+    pub tls: bool,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireConformanceMode {
+    SuiteAsClient,
+    SuiteAsServer,
+    SuiteAsProxy,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WireConformanceTransport {
+    Tcp,
+    Quic,
+    Websocket,
+    Ipc,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireConformanceLimits {
+    pub max_frame_bytes: u64,
+    pub max_in_flight: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceExecutionPlan {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub suite_version: String,
+    pub target_name: String,
+    pub artifacts: AdapterArtifactContext,
+    pub scenarios: Vec<WireConformanceScenario>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceScenario {
+    pub id: String,
+    pub mode: WireConformanceMode,
+    pub transport: WireConformanceTransport,
+    pub status: CaseStatus,
+    pub feature: String,
+    pub required_capabilities: Vec<String>,
+    pub description: String,
+    pub steps: Vec<WireConformanceStep>,
+    pub expect: WireConformanceExpectation,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceStep {
+    pub action: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub frame: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireConformanceExpectation {
+    pub terminal: WireConformanceTerminal,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub frames: Vec<String>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WireConformanceTerminal {
+    Success,
+    Cancelled,
+    Dropped,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceCaseResultReport {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub suite_version: String,
+    pub target_name: String,
+    pub results: Vec<WireConformanceCaseResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceCaseResult {
+    pub id: String,
+    pub outcome: ApiProfileCaseOutcome,
+    pub terminal: WireConformanceTerminal,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub observed_frames: Vec<WireConformanceObservedFrame>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WireConformanceObservedFrame {
+    pub direction: WireConformanceFrameDirection,
+    pub frame: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp_us: Option<u64>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WireConformanceFrameDirection {
+    Sent,
+    Received,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConformanceReport {
     pub protocol_version: String,
@@ -535,8 +698,11 @@ mod tests {
         AdapterCaseResultReport, AdapterExecutionPlan, ApiProfileCapabilityManifest,
         ApiProfileCaseResultReport, ApiProfileExecutionPlan, ApiProfileRecipe,
         ApiProfileSuiteManifest, BenchmarkExecutionPlan, BenchmarkResultReport, CapabilityManifest,
-        CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest, build_vector_manifest,
-        load_json_file, validate_protocol_alignment, verify_vector_manifest,
+        CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest,
+        WireConformanceCaseResultReport, WireConformanceExecutionPlan,
+        WireConformanceScenarioManifest, WireConformanceSuiteManifest,
+        WireConformanceTargetManifest, build_vector_manifest, load_json_file,
+        validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -821,6 +987,93 @@ mod tests {
 
         assert_eq!(report.adapter, "vllm-nnrp-adapter");
         assert_eq!(report.results.len(), 1);
+    }
+
+    #[test]
+    fn loads_wire_conformance_target_example() {
+        let manifest: WireConformanceTargetManifest = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("wire-conformance-target.sample.json"),
+        )
+        .expect("wire conformance target example should load");
+
+        assert_eq!(manifest.protocol_version, "nnrp-1-preview4");
+        assert_eq!(manifest.wire_conformance.transports.len(), 2);
+        assert!(
+            manifest
+                .wire_conformance
+                .capabilities
+                .iter()
+                .any(|capability| capability == "control.cancel_abort")
+        );
+    }
+
+    #[test]
+    fn loads_wire_conformance_execution_plan_example() {
+        let plan: WireConformanceExecutionPlan = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("wire-conformance-execution-plan.sample.json"),
+        )
+        .expect("wire conformance execution plan example should load");
+
+        assert_eq!(plan.protocol_version, "nnrp-1-preview4");
+        assert_eq!(plan.scenarios.len(), 1);
+        assert_eq!(plan.scenarios[0].required_capabilities.len(), 3);
+    }
+
+    #[test]
+    fn loads_wire_conformance_case_results_example() {
+        let report: WireConformanceCaseResultReport = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("wire-conformance-case-results.sample.json"),
+        )
+        .expect("wire conformance case results example should load");
+
+        assert_eq!(report.protocol_version, "nnrp-1-preview4");
+        assert_eq!(report.results.len(), 1);
+        assert_eq!(report.results[0].observed_frames.len(), 2);
+    }
+
+    #[test]
+    fn loads_preview4_wire_suite_manifest_and_scenarios() {
+        let wire_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("wire-conformance")
+            .join("nnrp-1-preview4");
+        let manifest: WireConformanceSuiteManifest =
+            load_json_file(wire_root.join("manifest.json"))
+                .expect("wire conformance suite manifest should load");
+
+        assert_eq!(manifest.protocol_version, "nnrp-1-preview4");
+        assert_eq!(manifest.scenario_manifests.len(), 1);
+
+        for scenario_path in &manifest.scenario_manifests {
+            let scenarios: WireConformanceScenarioManifest =
+                load_json_file(wire_root.join(scenario_path)).unwrap_or_else(|error| {
+                    panic!("wire scenario manifest {scenario_path} should load: {error}")
+                });
+
+            assert_eq!(scenarios.protocol_version, manifest.protocol_version);
+            assert!(
+                scenarios
+                    .scenarios
+                    .iter()
+                    .any(|scenario| scenario.feature == "control.cancel_abort")
+            );
+        }
     }
 
     #[test]

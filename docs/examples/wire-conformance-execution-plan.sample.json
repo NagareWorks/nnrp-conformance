@@ -1,0 +1,54 @@
+{
+  "$schema": "../../schemas/wire-conformance-execution-plan.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "suite_version": "0.1.0",
+  "target_name": "sample-preview4-target",
+  "artifacts": {
+    "results_path": "artifacts/wire-results.json",
+    "evidence_dir": "artifacts/wire-evidence"
+  },
+  "scenarios": [
+    {
+      "id": "wire.control.cancel-abort.client",
+      "mode": "suite_as_client",
+      "transport": "tcp",
+      "status": "experimental",
+      "feature": "control.cancel_abort",
+      "required_capabilities": [
+        "control.cancel_abort",
+        "control.result_drop_reason",
+        "control.trace_context"
+      ],
+      "description": "Runner submits an operation, sends CANCEL, and verifies cooperative termination or a typed drop reason over the wire.",
+      "steps": [
+        {
+          "action": "send",
+          "frame": "REQUEST",
+          "payload": {
+            "operation_id": "op-cancel-1"
+          }
+        },
+        {
+          "action": "send",
+          "frame": "CANCEL",
+          "payload": {
+            "operation_id": "op-cancel-1",
+            "reason": "superseded"
+          }
+        },
+        {
+          "action": "receive",
+          "frame": "RESULT_DROP_REASON",
+          "timeout_ms": 1000
+        }
+      ],
+      "expect": {
+        "terminal": "cancelled",
+        "frames": [
+          "TRACE_CONTEXT",
+          "RESULT_DROP_REASON"
+        ]
+      }
+    }
+  ]
+}

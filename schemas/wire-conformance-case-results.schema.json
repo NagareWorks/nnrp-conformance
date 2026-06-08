@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-case-results.schema.json",
+  "title": "NNRP Wire-level Conformance Case Results",
+  "type": "object",
+  "required": ["protocol_version", "suite_version", "target_name", "results"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "protocol_version": {
+      "type": "string",
+      "const": "nnrp-1-preview4"
+    },
+    "suite_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "outcome", "terminal"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["passed", "failed", "skipped"]
+          },
+          "terminal": {
+            "type": "string",
+            "enum": ["success", "cancelled", "dropped", "error"]
+          },
+          "observed_frames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["direction", "frame"],
+              "properties": {
+                "direction": {
+                  "type": "string",
+                  "enum": ["sent", "received"]
+                },
+                "frame": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "payload": {
+                  "type": "object"
+                },
+                "timestamp_us": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "default": []
+          },
+          "message": {
+            "type": "string"
+          },
+          "evidence_paths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}

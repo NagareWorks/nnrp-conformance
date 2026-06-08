@@ -1,0 +1,44 @@
+{
+  "$schema": "../../schemas/wire-conformance-target.schema.json",
+  "target_name": "sample-preview4-target",
+  "protocol_version": "nnrp-1-preview4",
+  "suite_version": "0.1.0",
+  "wire_conformance": {
+    "modes": [
+      "suite_as_client",
+      "suite_as_server",
+      "suite_as_proxy"
+    ],
+    "transports": [
+      {
+        "name": "tcp",
+        "endpoint": "127.0.0.1:19091",
+        "tls": false
+      },
+      {
+        "name": "quic",
+        "endpoint": "127.0.0.1:19092",
+        "tls": false
+      }
+    ],
+    "capabilities": [
+      "control.cancel_abort",
+      "control.priority_update",
+      "control.deadline_expire",
+      "control.progress_partial",
+      "control.credit_backpressure",
+      "control.capability_costs",
+      "control.route_execution_hint",
+      "control.cache_reference",
+      "control.trace_context",
+      "control.result_drop_reason",
+      "control.degrade_profile",
+      "control.budget_update",
+      "object.lifecycle"
+    ],
+    "limits": {
+      "max_frame_bytes": 16777216,
+      "max_in_flight": 256
+    }
+  }
+}

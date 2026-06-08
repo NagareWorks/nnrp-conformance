@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-target.schema.json",
+  "title": "NNRP Wire-level Conformance Target Manifest",
+  "type": "object",
+  "required": ["target_name", "protocol_version", "suite_version", "wire_conformance"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "target_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_version": {
+      "type": "string",
+      "const": "nnrp-1-preview4"
+    },
+    "suite_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "wire_conformance": {
+      "type": "object",
+      "required": ["modes", "transports", "capabilities", "limits"],
+      "properties": {
+        "modes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["suite_as_client", "suite_as_server", "suite_as_proxy"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "transports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "endpoint", "tls"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": ["tcp", "quic", "websocket", "ipc"]
+              },
+              "endpoint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tls": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "limits": {
+          "type": "object",
+          "required": ["max_frame_bytes", "max_in_flight"],
+          "properties": {
+            "max_frame_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_in_flight": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
