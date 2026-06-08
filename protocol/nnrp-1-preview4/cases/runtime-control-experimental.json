@@ -1,0 +1,28 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "runtime-control-experimental",
+  "cases": [
+    {
+      "id": "l1.control.supersede",
+      "layer": "L1",
+      "status": "experimental",
+      "feature": "control.supersede",
+      "required_capabilities": [
+        "control.supersede",
+        "control.result_drop_reason"
+      ],
+      "description": "Replace an obsolete operation while preserving trace continuity and marking late results droppable."
+    },
+    {
+      "id": "l1.control.retry-after",
+      "layer": "L1",
+      "status": "experimental",
+      "feature": "control.retry_after",
+      "required_capabilities": [
+        "control.retry_after"
+      ],
+      "description": "Distinguish retryable pressure from terminal failure and provide retry-after timing."
+    }
+  ]
+}

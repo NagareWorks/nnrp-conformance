@@ -1,0 +1,30 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "runtime-object-core",
+  "cases": [
+    {
+      "id": "l1.object.lifecycle",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "object.lifecycle",
+      "required_capabilities": [
+        "object.lifecycle",
+        "object.cost",
+        "object.ownership"
+      ],
+      "description": "Declare runtime objects, reference them in operations, and release ownership explicitly."
+    },
+    {
+      "id": "l1.object.delta",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "object.delta",
+      "required_capabilities": [
+        "object.delta",
+        "object.lifecycle"
+      ],
+      "description": "Send object patches or deltas without resending the full runtime object."
+    }
+  ]
+}

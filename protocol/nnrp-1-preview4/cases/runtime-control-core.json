@@ -1,0 +1,52 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "runtime-control-core",
+  "cases": [
+    {
+      "id": "l1.control.cancel-abort",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "control.cancel_abort",
+      "required_capabilities": [
+        "control.cancel_abort",
+        "control.result_drop_reason",
+        "control.trace_context"
+      ],
+      "description": "Cancel or abort an operation by id and emit a typed terminal state with trace context."
+    },
+    {
+      "id": "l1.control.priority-deadline",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "control.priority_deadline",
+      "required_capabilities": [
+        "control.priority_update",
+        "control.deadline_expire",
+        "control.result_drop_reason"
+      ],
+      "description": "Apply priority updates and deadline expiry without completing stale work late."
+    },
+    {
+      "id": "l1.control.progress-backpressure",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "control.progress_backpressure",
+      "required_capabilities": [
+        "control.progress_partial",
+        "control.credit_backpressure"
+      ],
+      "description": "Emit progress and partial results while respecting credit updates and backpressure."
+    },
+    {
+      "id": "l1.control.capability-costs",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "control.capability_costs",
+      "required_capabilities": [
+        "control.capability_costs"
+      ],
+      "description": "Negotiate capabilities with cost, preference, limit, and downgrade metadata."
+    }
+  ]
+}

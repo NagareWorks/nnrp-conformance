@@ -1,0 +1,17 @@
+{
+  "$schema": "../../schemas/protocol-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "suite_version": "0.1.0",
+  "status": "frozen",
+  "case_manifests": [
+    "cases/runtime-control-core.json",
+    "cases/runtime-object-core.json",
+    "cases/runtime-control-optional.json",
+    "cases/runtime-control-experimental.json"
+  ],
+  "vector_recipe_manifests": [
+    "vectors/semantic-vectors.json"
+  ],
+  "vector_manifests": [],
+  "report_schema": "../../schemas/report.schema.json"
+}

@@ -1,0 +1,118 @@
+{
+  "$schema": "../../../schemas/semantic-vector-recipes.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "vectors": [
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.cancel",
+      "description": "Preview4 control frame id for CANCEL.",
+      "kind": "control_frame",
+      "value": 262145
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.abort",
+      "description": "Preview4 control frame id for ABORT.",
+      "kind": "control_frame",
+      "value": 262146
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.priority_update",
+      "description": "Preview4 control frame id for PRIORITY_UPDATE.",
+      "kind": "control_frame",
+      "value": 262147
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.expire_at",
+      "description": "Preview4 control frame id for EXPIRE_AT.",
+      "kind": "control_frame",
+      "value": 262148
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.progress",
+      "description": "Preview4 control frame id for PROGRESS.",
+      "kind": "control_frame",
+      "value": 262149
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.partial_result",
+      "description": "Preview4 control frame id for PARTIAL_RESULT.",
+      "kind": "control_frame",
+      "value": 262150
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.credit_update",
+      "description": "Preview4 control frame id for CREDIT_UPDATE.",
+      "kind": "control_frame",
+      "value": 262151
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.capability_negotiation",
+      "description": "Preview4 control frame id for capability negotiation with cost metadata.",
+      "kind": "control_frame",
+      "value": 262152
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.control_frame.result_drop_reason",
+      "description": "Preview4 control frame id for RESULT_DROP_REASON.",
+      "kind": "control_frame",
+      "value": 262153
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.object_frame.declare",
+      "description": "Preview4 object frame id for OBJECT_DECLARE.",
+      "kind": "object_frame",
+      "value": 327681
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.object_frame.ref",
+      "description": "Preview4 object frame id for OBJECT_REF.",
+      "kind": "object_frame",
+      "value": 327682
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.object_frame.release",
+      "description": "Preview4 object frame id for OBJECT_RELEASE.",
+      "kind": "object_frame",
+      "value": 327683
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.object_frame.delta",
+      "description": "Preview4 object frame id for OBJECT_DELTA.",
+      "kind": "object_frame",
+      "value": 327684
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.result_drop_reason.deadline_expired",
+      "description": "Preview4 drop reason for deadline expiry.",
+      "kind": "result_drop_reason",
+      "value": 393217
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.result_drop_reason.superseded",
+      "description": "Preview4 drop reason for superseded work.",
+      "kind": "result_drop_reason",
+      "value": 393218
+    },
+    {
+      "recipe_type": "u32_value",
+      "name": "preview4.value.result_drop_reason.backpressure",
+      "description": "Preview4 drop reason for backpressure.",
+      "kind": "result_drop_reason",
+      "value": 393219
+    }
+  ]
+}

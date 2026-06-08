@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/capability-manifest.schema.json",
+  "implementation_name": "preview4-reference-target",
+  "protocol_version": "nnrp-1-preview4",
+  "supports": [
+    "control.cancel_abort",
+    "control.priority_update",
+    "control.deadline_expire",
+    "control.progress_partial",
+    "control.credit_backpressure",
+    "control.capability_costs",
+    "control.route_execution_hint",
+    "control.cache_reference",
+    "control.trace_context",
+    "control.result_drop_reason",
+    "object.lifecycle",
+    "object.delta",
+    "object.cost",
+    "object.ownership"
+  ]
+}

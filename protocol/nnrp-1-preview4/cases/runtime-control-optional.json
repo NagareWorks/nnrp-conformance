@@ -1,0 +1,38 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "runtime-control-optional",
+  "cases": [
+    {
+      "id": "l1.control.route-execution-hint",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "control.route_execution_hint",
+      "required_capabilities": [
+        "control.route_execution_hint"
+      ],
+      "description": "Carry route and execution hints for runtime scheduling without JSON or protobuf wrappers."
+    },
+    {
+      "id": "l1.control.cache-reference",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "control.cache_reference",
+      "required_capabilities": [
+        "control.cache_reference"
+      ],
+      "description": "Use cache references, misses, and invalidation only where identity and invalidation are well-defined."
+    },
+    {
+      "id": "l1.control.degrade-budget",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "control.degrade_budget",
+      "required_capabilities": [
+        "control.degrade_profile",
+        "control.budget_update"
+      ],
+      "description": "Negotiate a cheaper profile and update compute, token, memory, or bandwidth budgets during a session."
+    }
+  ]
+}

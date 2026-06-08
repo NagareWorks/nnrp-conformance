@@ -819,6 +819,42 @@ mod tests {
     }
 
     #[test]
+    fn loads_preview4_case_manifests_from_repo_fixture() {
+        let protocol_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("protocol")
+            .join("nnrp-1-preview4");
+        let protocol_manifest: ProtocolManifest =
+            load_json_file(protocol_root.join("manifest.json"))
+                .expect("preview4 protocol manifest should load");
+        let capability_manifest: CapabilityManifest =
+            load_json_file(protocol_root.join("example-capabilities.json"))
+                .expect("preview4 example capability manifest should load");
+
+        assert_eq!(protocol_manifest.protocol_version, "nnrp-1-preview4");
+        assert_eq!(protocol_manifest.case_manifests.len(), 4);
+
+        for relative_path in &protocol_manifest.case_manifests {
+            let case_manifest: CaseManifest = load_json_file(protocol_root.join(relative_path))
+                .unwrap_or_else(|error| {
+                    panic!("preview4 case manifest {relative_path} should load: {error}")
+                });
+
+            validate_protocol_alignment(
+                &protocol_manifest,
+                &case_manifest,
+                Some(&capability_manifest),
+                PathBuf::from(relative_path),
+                Some(PathBuf::from("example-capabilities.json")),
+            )
+            .unwrap_or_else(|error| {
+                panic!("preview4 case manifest {relative_path} should align: {error}")
+            });
+        }
+    }
+
+    #[test]
     fn loads_adapter_execution_plan_example() {
         let plan: AdapterExecutionPlan = load_json_file(
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1137,6 +1173,43 @@ mod tests {
             })
             .expect("typed payload descriptor vector should exist");
         assert_eq!(typed_descriptor.bytes, 24);
+    }
+
+    #[test]
+    fn generates_preview4_semantic_vectors_from_repo_fixture() {
+        let semantic_manifest: SemanticVectorManifest = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("protocol")
+                .join("nnrp-1-preview4")
+                .join("vectors")
+                .join("semantic-vectors.json"),
+        )
+        .expect("preview4 semantic vector manifest should load");
+
+        let vector_manifest =
+            build_vector_manifest(&semantic_manifest, "vectors/semantic-vectors.json")
+                .expect("preview4 semantic vectors should generate");
+
+        assert_eq!(vector_manifest.protocol_version, "nnrp-1-preview4");
+        assert_eq!(vector_manifest.vectors.len(), 16);
+
+        let cancel = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| vector.name == "preview4.value.control_frame.cancel")
+            .expect("cancel control frame vector should exist");
+        assert_eq!(cancel.kind, "control_frame");
+        assert_eq!(cancel.hex, "01000400");
+
+        let object_delta = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| vector.name == "preview4.value.object_frame.delta")
+            .expect("object delta vector should exist");
+        assert_eq!(object_delta.kind, "object_frame");
+        assert_eq!(object_delta.bytes, 4);
     }
 
     #[test]

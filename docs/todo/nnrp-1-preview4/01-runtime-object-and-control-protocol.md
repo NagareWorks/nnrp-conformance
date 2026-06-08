@@ -11,8 +11,8 @@ and control semantics.
 - [x] Define the preview4 runtime object capability catalog.
 - [x] Keep cache reference as an optional object-lifecycle strategy rather than a universal latency
       promise.
-- [ ] Add canonical semantic vectors for the listed control and runtime object frames.
-- [ ] Split the listed capability tokens into mandatory, optional, and experimental groups.
+- [x] Add canonical semantic vectors for the listed control and runtime object frames.
+- [x] Split the listed capability tokens into mandatory, optional, and experimental groups.
 
 ## Exit criteria
 
