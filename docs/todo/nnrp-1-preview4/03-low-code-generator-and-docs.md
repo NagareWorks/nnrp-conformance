@@ -10,9 +10,9 @@ SDK capability or OpenAI API profile declarations.
 - [x] Add wire-level target manifest examples.
 - [x] Add fixture structs and tests for wire-level conformance JSON.
 - [x] Keep target examples aligned with the preview4 TCP, QUIC, IPC, and WebSocket transport set.
-- [ ] Publish schema documentation for the wire target, execution plan, and result report.
-- [ ] Keep the docs generator synchronized with `wire-conformance/nnrp-1-preview4/manifest.json`.
-- [ ] Add migration notes explaining when to use adapter execution versus wire-level execution.
+- [x] Publish schema documentation for the wire target, execution plan, and result report.
+- [x] Keep the docs generator synchronized with `wire-conformance/nnrp-1-preview4/manifest.json`.
+- [x] Add migration notes explaining when to use adapter execution versus wire-level execution.
 
 ## Exit criteria
 

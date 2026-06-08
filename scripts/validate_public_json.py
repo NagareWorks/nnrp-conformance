@@ -9,6 +9,7 @@ from pathlib import Path
 
 try:
     from jsonschema import Draft202012Validator
+    from referencing import Registry, Resource
 except ImportError as exc:  # pragma: no cover - exercised in CI/runtime, not unit tests
     raise SystemExit(
         "missing Python dependency 'jsonschema'; install it with 'python -m pip install jsonschema'"
@@ -24,10 +25,28 @@ def load_json(path: Path) -> object:
         raise SystemExit(f"failed to parse JSON file {path}: {exc}") from exc
 
 
-def validate_json(schema_path: Path, instance_path: Path) -> None:
+def build_schema_registry(schema_root: Path) -> Registry:
+    registry = Registry()
+    for schema_path in sorted(schema_root.glob("*.schema.json")):
+        schema = load_json(schema_path)
+        if not isinstance(schema, dict):
+            raise SystemExit(f"schema must be a JSON object: {schema_path}")
+
+        resource = Resource.from_contents(schema)
+        schema_id = schema.get("$id")
+        if isinstance(schema_id, str) and schema_id:
+            registry = registry.with_resource(schema_id, resource)
+        registry = registry.with_resource(schema_path.name, resource)
+
+    return registry
+
+
+def validate_json(schema_path: Path, instance_path: Path, registry: Registry | None = None) -> None:
     schema = load_json(schema_path)
     instance = load_json(instance_path)
-    validator = Draft202012Validator(schema)
+    if registry is None:
+        registry = build_schema_registry(schema_path.parent)
+    validator = Draft202012Validator(schema, registry=registry)
     errors = sorted(validator.iter_errors(instance), key=lambda error: list(error.absolute_path))
     if not errors:
         return
@@ -94,18 +113,19 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
     protocol_root = protocol_manifest_path.parent
     repo_root = find_repo_root(protocol_root)
     schema_root = repo_root / "schemas"
+    registry = build_schema_registry(schema_root)
 
-    validate_json(schema_root / "protocol-manifest.schema.json", protocol_manifest_path)
+    validate_json(schema_root / "protocol-manifest.schema.json", protocol_manifest_path, registry)
     protocol_manifest = load_json(protocol_manifest_path)
     if not isinstance(protocol_manifest, dict):
         raise SystemExit(f"protocol manifest must be a JSON object: {protocol_manifest_path}")
 
     for relative_path in protocol_manifest.get("case_manifests", []):
-        validate_json(schema_root / "case-manifest.schema.json", protocol_root / relative_path)
+        validate_json(schema_root / "case-manifest.schema.json", protocol_root / relative_path, registry)
 
     example_capabilities = protocol_root / "example-capabilities.json"
     if example_capabilities.exists():
-        validate_json(schema_root / "capability-manifest.schema.json", example_capabilities)
+        validate_json(schema_root / "capability-manifest.schema.json", example_capabilities, registry)
         validate_capability_tokens(protocol_root, protocol_manifest, example_capabilities)
 
     for relative_path in protocol_manifest.get("vector_recipe_manifests", []):
@@ -113,45 +133,48 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
             validate_json(
                 schema_root / "semantic-vector-recipes.schema.json",
                 protocol_root / relative_path,
+                registry,
             )
 
     for relative_path in protocol_manifest.get("vector_manifests", []):
         if relative_path:
-            validate_json(schema_root / "vector-manifest.schema.json", protocol_root / relative_path)
+            validate_json(schema_root / "vector-manifest.schema.json", protocol_root / relative_path, registry)
 
     docs_examples = repo_root / "docs" / "examples"
     adapter_plan_example = docs_examples / "adapter-execution-plan.sample.json"
     if adapter_plan_example.exists():
-        validate_json(schema_root / "adapter-execution-plan.schema.json", adapter_plan_example)
+        validate_json(schema_root / "adapter-execution-plan.schema.json", adapter_plan_example, registry)
 
     adapter_results_example = docs_examples / "adapter-case-results.sample.json"
     if adapter_results_example.exists():
-        validate_json(schema_root / "adapter-case-results.schema.json", adapter_results_example)
+        validate_json(schema_root / "adapter-case-results.schema.json", adapter_results_example, registry)
 
     benchmark_plan_example = docs_examples / "benchmark-execution-plan.sample.json"
     if benchmark_plan_example.exists():
-        validate_json(schema_root / "benchmark-execution-plan.schema.json", benchmark_plan_example)
+        validate_json(schema_root / "benchmark-execution-plan.schema.json", benchmark_plan_example, registry)
 
     benchmark_results_example = docs_examples / "benchmark-results.sample.json"
     if benchmark_results_example.exists():
-        validate_json(schema_root / "benchmark-results.schema.json", benchmark_results_example)
+        validate_json(schema_root / "benchmark-results.schema.json", benchmark_results_example, registry)
 
     api_profile_capabilities_example = docs_examples / "api-profile-capabilities.sample.json"
     if api_profile_capabilities_example.exists():
         validate_json(
             schema_root / "api-profile-capabilities.schema.json",
             api_profile_capabilities_example,
+            registry,
         )
 
     api_profile_recipe_example = docs_examples / "api-profile-recipe.sample.json"
     if api_profile_recipe_example.exists():
-        validate_json(schema_root / "api-profile-recipe.schema.json", api_profile_recipe_example)
+        validate_json(schema_root / "api-profile-recipe.schema.json", api_profile_recipe_example, registry)
 
     api_profile_plan_example = docs_examples / "api-profile-execution-plan.sample.json"
     if api_profile_plan_example.exists():
         validate_json(
             schema_root / "api-profile-execution-plan.schema.json",
             api_profile_plan_example,
+            registry,
         )
 
     api_profile_results_example = docs_examples / "api-profile-case-results.sample.json"
@@ -159,11 +182,12 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
         validate_json(
             schema_root / "api-profile-case-results.schema.json",
             api_profile_results_example,
+            registry,
         )
 
     profile_manifest = repo_root / "profiles" / "openai-compatible" / "1" / "manifest.json"
     if profile_manifest.exists():
-        validate_json(schema_root / "api-profile-suite.schema.json", profile_manifest)
+        validate_json(schema_root / "api-profile-suite.schema.json", profile_manifest, registry)
         profile_root = profile_manifest.parent
         profile = load_json(profile_manifest)
         if not isinstance(profile, dict):
@@ -172,6 +196,41 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
             validate_json(
                 schema_root / "api-profile-recipe.schema.json",
                 profile_root / str(relative_path),
+                registry,
+            )
+
+    wire_target_example = docs_examples / "wire-conformance-target.sample.json"
+    if wire_target_example.exists():
+        validate_json(schema_root / "wire-conformance-target.schema.json", wire_target_example, registry)
+
+    wire_plan_example = docs_examples / "wire-conformance-execution-plan.sample.json"
+    if wire_plan_example.exists():
+        validate_json(
+            schema_root / "wire-conformance-execution-plan.schema.json",
+            wire_plan_example,
+            registry,
+        )
+
+    wire_results_example = docs_examples / "wire-conformance-case-results.sample.json"
+    if wire_results_example.exists():
+        validate_json(
+            schema_root / "wire-conformance-case-results.schema.json",
+            wire_results_example,
+            registry,
+        )
+
+    wire_root = repo_root / "wire-conformance" / "nnrp-1-preview4"
+    wire_manifest = wire_root / "manifest.json"
+    if wire_manifest.exists():
+        validate_json(schema_root / "wire-conformance-suite.schema.json", wire_manifest, registry)
+        suite = load_json(wire_manifest)
+        if not isinstance(suite, dict):
+            raise SystemExit(f"wire conformance suite manifest must be a JSON object: {wire_manifest}")
+        for relative_path in suite.get("scenario_manifests", []):
+            validate_json(
+                schema_root / "wire-conformance-scenario.schema.json",
+                wire_root / str(relative_path),
+                registry,
             )
 
 

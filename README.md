@@ -71,6 +71,21 @@ The suite-owned public JSON files for informational benchmark execution live at:
 3. `docs/examples/benchmark-execution-plan.sample.json`
 4. `docs/examples/benchmark-results.sample.json`
 
+The suite-owned public JSON files for preview4 wire-level execution live at:
+
+1. `schemas/wire-conformance-suite.schema.json`
+2. `schemas/wire-conformance-scenario.schema.json`
+3. `schemas/wire-conformance-target.schema.json`
+4. `schemas/wire-conformance-execution-plan.schema.json`
+5. `schemas/wire-conformance-case-results.schema.json`
+6. `docs/examples/wire-conformance-target.sample.json`
+7. `docs/examples/wire-conformance-execution-plan.sample.json`
+8. `docs/examples/wire-conformance-case-results.sample.json`
+
+The wire-level contract is documented in `docs/wire-level-conformance.md`. Preview4 freezes TCP,
+QUIC, IPC, and WebSocket as target transports, while live endpoint driving remains a transport
+implementation task.
+
 ## Third-Party Implementation Integration
 
 Third-party implementations should consume this baseline through published JSON artifacts and the suite-owned action, not through Rust crate internals.
@@ -186,6 +201,27 @@ cargo run -p nnrp-conformance-runner -- \
   validate-adapter-results \
   --plan artifacts/$NNRP_PROTOCOL_VERSION-adapter-plan.json \
   --results artifacts/adapter-results.json
+```
+
+Emit a preview4 wire execution plan for a live target declaration:
+
+```bash
+export NNRP_WIRE_SUITE=wire-conformance/nnrp-1-preview4/manifest.json
+
+cargo run -p nnrp-conformance-runner -- \
+  wire-plan \
+  --suite $NNRP_WIRE_SUITE \
+  --target docs/examples/wire-conformance-target.sample.json \
+  --output artifacts/preview4-wire-plan.json
+```
+
+Validate wire-level result observations against a suite-owned plan:
+
+```bash
+cargo run -p nnrp-conformance-runner -- \
+  validate-wire-results \
+  --plan docs/examples/wire-conformance-execution-plan.sample.json \
+  --results docs/examples/wire-conformance-case-results.sample.json
 ```
 
 ## CI Contract
