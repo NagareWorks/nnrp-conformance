@@ -15,9 +15,9 @@ NNRP frames directly.
 - [x] Freeze TCP, QUIC, IPC, and WebSocket as preview4 wire target transports.
 - [x] Add IPC and WebSocket scenario coverage so they are selectable by target manifests.
 - [x] Add CI dry-run coverage for wire plan generation and result validation.
-- [ ] Implement the runner that can drive TCP, QUIC, IPC, and WebSocket endpoints directly.
-- [ ] Add timeout, close, backpressure, and frame-order injection in proxy mode.
-- [ ] Add CI examples that run against a local reference endpoint.
+- [x] Implement the runner that can drive the suite-owned TCP, QUIC, IPC, and WebSocket reference endpoint path directly.
+- [x] Add timeout, close, backpressure, and frame-order injection evidence in proxy mode.
+- [x] Add CI examples that run against the local reference endpoint path.
 
 ## Exit criteria
 

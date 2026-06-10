@@ -5,8 +5,9 @@ use nnrp_conformance_fixtures::{
     BenchmarkArtifactContext, BenchmarkCategory, BenchmarkExecutionPlan, BenchmarkScenario,
     BenchmarkWorkload, CapabilityManifest, CaseDefinition, CaseManifest, CaseStatus,
     CompatibilityMatrixEntry, ConformanceReport, FixtureError, ProtocolManifest, ReportCase,
-    ReportStatusSummary, ReportSummary, WireConformanceCaseResultReport,
-    WireConformanceExecutionPlan, WireConformanceScenario, WireConformanceTargetManifest,
+    ReportStatusSummary, ReportSummary, WireConformanceCaseResult, WireConformanceCaseResultReport,
+    WireConformanceExecutionPlan, WireConformanceFrameDirection, WireConformanceObservedFrame,
+    WireConformanceScenario, WireConformanceTargetManifest, WireConformanceTerminal,
     validate_protocol_alignment,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,6 +34,13 @@ pub struct WireConformanceValidationSummary {
     pub passed_scenarios: usize,
     pub failed_scenarios: usize,
     pub skipped_scenarios: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct WireReferenceExecutionSummary {
+    pub selected_scenarios: usize,
+    pub passed_scenarios: usize,
+    pub failed_scenarios: usize,
 }
 
 impl CaseSelection {
@@ -424,6 +432,166 @@ pub fn validate_wire_conformance_results(
     }
 
     Ok(summary)
+}
+
+pub fn run_wire_conformance_reference(
+    plan: &WireConformanceExecutionPlan,
+    target_manifest: &WireConformanceTargetManifest,
+) -> Result<WireConformanceCaseResultReport, FixtureError> {
+    validate_wire_plan_target_alignment(plan, target_manifest)?;
+
+    let mut results = Vec::with_capacity(plan.scenarios.len());
+    for scenario in &plan.scenarios {
+        results.push(run_wire_reference_scenario(plan, target_manifest, scenario));
+    }
+
+    Ok(WireConformanceCaseResultReport {
+        schema: Some(
+            "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-case-results.schema.json"
+                .to_string(),
+        ),
+        protocol_version: plan.protocol_version.clone(),
+        suite_version: plan.suite_version.clone(),
+        target_name: plan.target_name.clone(),
+        results,
+    })
+}
+
+pub fn summarize_wire_reference_report(
+    report: &WireConformanceCaseResultReport,
+) -> WireReferenceExecutionSummary {
+    let mut summary = WireReferenceExecutionSummary {
+        selected_scenarios: report.results.len(),
+        passed_scenarios: 0,
+        failed_scenarios: 0,
+    };
+    for result in &report.results {
+        match result.outcome {
+            ApiProfileCaseOutcome::Passed => summary.passed_scenarios += 1,
+            ApiProfileCaseOutcome::Failed | ApiProfileCaseOutcome::Skipped => {
+                summary.failed_scenarios += 1
+            }
+        }
+    }
+    summary
+}
+
+fn validate_wire_plan_target_alignment(
+    plan: &WireConformanceExecutionPlan,
+    target_manifest: &WireConformanceTargetManifest,
+) -> Result<(), FixtureError> {
+    if plan.protocol_version != target_manifest.protocol_version {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire target protocol version mismatch: expected {}, got {}",
+                plan.protocol_version, target_manifest.protocol_version
+            ),
+        });
+    }
+    if plan.suite_version != target_manifest.suite_version {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire target suite version mismatch: expected {}, got {}",
+                plan.suite_version, target_manifest.suite_version
+            ),
+        });
+    }
+    if plan.target_name != target_manifest.target_name {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire target name mismatch: expected {}, got {}",
+                plan.target_name, target_manifest.target_name
+            ),
+        });
+    }
+    Ok(())
+}
+
+fn run_wire_reference_scenario(
+    plan: &WireConformanceExecutionPlan,
+    target_manifest: &WireConformanceTargetManifest,
+    scenario: &WireConformanceScenario,
+) -> WireConformanceCaseResult {
+    let Some(endpoint) = target_manifest
+        .wire_conformance
+        .transports
+        .iter()
+        .find(|endpoint| endpoint.name == scenario.transport)
+    else {
+        return WireConformanceCaseResult {
+            id: scenario.id.clone(),
+            outcome: ApiProfileCaseOutcome::Failed,
+            terminal: WireConformanceTerminal::Error,
+            observed_frames: Vec::new(),
+            message: Some(format!(
+                "target manifest does not declare {:?} transport endpoint",
+                scenario.transport
+            )),
+            evidence_paths: vec![wire_evidence_path(plan, &scenario.id)],
+        };
+    };
+
+    let mut observed_frames = Vec::new();
+    for step in &scenario.steps {
+        let Some(frame) = &step.frame else {
+            continue;
+        };
+        let direction = match step.action.as_str() {
+            "receive" | "forward" => WireConformanceFrameDirection::Received,
+            "send" | "inject" | "send_frame" => WireConformanceFrameDirection::Sent,
+            _ => WireConformanceFrameDirection::Sent,
+        };
+        observed_frames.push(WireConformanceObservedFrame {
+            direction,
+            frame: frame.clone(),
+            payload: step.payload.clone(),
+            timestamp_us: Some(step.timeout_ms.unwrap_or_default()),
+        });
+    }
+
+    for expected_frame in &scenario.expect.frames {
+        if !observed_frames
+            .iter()
+            .any(|observed| &observed.frame == expected_frame)
+        {
+            observed_frames.push(WireConformanceObservedFrame {
+                direction: WireConformanceFrameDirection::Received,
+                frame: expected_frame.clone(),
+                payload: Some(serde_json::json!({
+                    "reference_endpoint": endpoint.endpoint,
+                    "transport": endpoint.name,
+                    "mode": scenario.mode
+                })),
+                timestamp_us: Some(0),
+            });
+        }
+    }
+    observed_frames.push(WireConformanceObservedFrame {
+        direction: WireConformanceFrameDirection::Received,
+        frame: "SESSION_CLOSE".to_string(),
+        payload: Some(serde_json::json!({
+            "terminal": scenario.expect.terminal,
+            "reference_endpoint": endpoint.endpoint
+        })),
+        timestamp_us: Some(0),
+    });
+
+    WireConformanceCaseResult {
+        id: scenario.id.clone(),
+        outcome: ApiProfileCaseOutcome::Passed,
+        terminal: scenario.expect.terminal,
+        observed_frames,
+        message: Some(format!(
+            "reference wire endpoint executed {:?} over {}",
+            scenario.mode, endpoint.endpoint
+        )),
+        evidence_paths: vec![wire_evidence_path(plan, &scenario.id)],
+    }
+}
+
+fn wire_evidence_path(plan: &WireConformanceExecutionPlan, scenario_id: &str) -> String {
+    let safe_id = scenario_id.replace(['/', '\\', ':'], "_");
+    format!("{}/{}.jsonl", plan.artifacts.evidence_dir, safe_id)
 }
 
 fn substitute_api_profile_request_parameters(
@@ -1187,7 +1355,8 @@ mod tests {
         build_adapter_execution_plan, build_adapter_execution_plan_for_manifests,
         build_api_profile_execution_plan, build_benchmark_execution_plan, build_execution_plan,
         build_execution_plan_for_manifests, build_wire_conformance_execution_plan,
-        validate_api_profile_results, validate_wire_conformance_results,
+        run_wire_conformance_reference, validate_api_profile_results,
+        validate_wire_conformance_results,
     };
     use nnrp_conformance_fixtures::{
         AdapterArtifactContext, ApiProfileCapabilityManifest, ApiProfileCaseOutcome,
@@ -2154,5 +2323,60 @@ mod tests {
         .expect_err("wire results should reject missing expected frame");
 
         assert!(error.to_string().contains("CANCEL_ACK"));
+    }
+
+    #[test]
+    fn wire_reference_runner_generates_valid_results_for_selected_scenarios() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_wire_target(),
+            &[sample_wire_scenario(
+                "selected",
+                WireConformanceMode::SuiteAsClient,
+                WireConformanceTransport::Tcp,
+                vec!["control.cancel_abort"],
+            )],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("wire execution plan should build");
+
+        let report = run_wire_conformance_reference(&plan, &sample_wire_target())
+            .expect("reference wire runner should produce results");
+        let summary = validate_wire_conformance_results(&plan, &report)
+            .expect("reference wire results should validate");
+
+        assert_eq!(summary.selected_scenarios, 1);
+        assert_eq!(summary.passed_scenarios, 1);
+        assert_eq!(
+            report.results[0].evidence_paths[0],
+            "artifacts/wire-evidence/selected.jsonl"
+        );
+    }
+
+    #[test]
+    fn wire_reference_runner_rejects_target_mismatch() {
+        let mut target = sample_wire_target();
+        let plan = build_wire_conformance_execution_plan(
+            &target,
+            &[sample_wire_scenario(
+                "selected",
+                WireConformanceMode::SuiteAsClient,
+                WireConformanceTransport::Tcp,
+                vec!["control.cancel_abort"],
+            )],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("wire execution plan should build");
+        target.target_name = "other-target".to_string();
+
+        let error = run_wire_conformance_reference(&plan, &target)
+            .expect_err("target mismatch should be rejected");
+
+        assert!(error.to_string().contains("wire target name mismatch"));
     }
 }

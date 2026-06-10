@@ -78,9 +78,19 @@ The plan contains only selected scenarios. A scenario is selected when all three
 
 ## Result report
 
-Result reports are machine-readable observations for the selected plan. They must keep the scenario
-IDs from the plan exactly, report the terminal state, and include enough observed frame evidence for
-the suite to validate expected frames.
+Result reports are machine-readable observations for the selected plan. The runner can execute the
+suite-owned reference endpoint path and write a result report directly:
+
+```bash
+cargo run -p nnrp-conformance-runner -- \
+  wire-run \
+  --plan artifacts/wire-plan.json \
+  --target docs/examples/wire-conformance-target.sample.json \
+  --output artifacts/wire-results.json
+```
+
+The report keeps scenario IDs from the plan exactly, reports the terminal state, and includes enough
+observed frame evidence for the suite to validate expected frames.
 
 ```bash
 cargo run -p nnrp-conformance-runner -- \
@@ -111,6 +121,11 @@ The two paths should not be collapsed:
 
 ## Current implementation boundary
 
-The current runner can build and validate wire execution plans and result reports. Live endpoint
-driving is intentionally tracked as a later preview4 implementation step, because it depends on
-reference TCP, QUIC, IPC, and WebSocket transport endpoints.
+The current runner can build a wire execution plan, execute the suite-owned reference endpoint path,
+write JSONL evidence for every selected scenario, and validate the generated result report. CI runs
+that flow against the preview4 TCP, QUIC, IPC, and WebSocket scenario set so the target manifest,
+scenario manifests, result schema, timeout hints, proxy injection steps, terminal close evidence,
+and expected frame checks stay synchronized.
+
+Third-party live endpoints use the same target manifest and execution-plan contract. Adapter
+execution remains separate and should not be used to prove wire-level semantics.

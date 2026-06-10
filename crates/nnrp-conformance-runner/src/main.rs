@@ -14,7 +14,8 @@ use nnrp_conformance_runner::{
     build_adapter_execution_plan, build_adapter_execution_plan_for_manifests,
     build_api_profile_execution_plan, build_benchmark_execution_plan, build_execution_plan,
     build_execution_plan_for_manifests, build_wire_conformance_execution_plan,
-    validate_api_profile_results, validate_wire_conformance_results,
+    run_wire_conformance_reference, summarize_wire_reference_report, validate_api_profile_results,
+    validate_wire_conformance_results,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -139,6 +140,14 @@ enum Command {
         plan: PathBuf,
         #[arg(long)]
         results: PathBuf,
+    },
+    WireRun {
+        #[arg(long)]
+        plan: PathBuf,
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 }
 
@@ -408,8 +417,48 @@ fn main() -> Result<()> {
             let summary = validate_wire_conformance_results(&wire_plan, &wire_results)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
+        Command::WireRun {
+            plan,
+            target,
+            output,
+        } => {
+            let wire_plan: WireConformanceExecutionPlan = load_json_file(&plan)?;
+            let target_manifest: WireConformanceTargetManifest = load_json_file(&target)?;
+            let report = run_wire_conformance_reference(&wire_plan, &target_manifest)?;
+            write_wire_evidence(&wire_plan, &report)?;
+            let output_path =
+                output.unwrap_or_else(|| PathBuf::from(&wire_plan.artifacts.results_path));
+            write_text_output(
+                &output_path,
+                &format!("{}\n", serde_json::to_string_pretty(&report)?),
+            )?;
+            let summary = summarize_wire_reference_report(&report);
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
     }
 
+    Ok(())
+}
+
+fn write_wire_evidence(
+    plan: &WireConformanceExecutionPlan,
+    report: &WireConformanceCaseResultReport,
+) -> Result<()> {
+    for result in &report.results {
+        for evidence_path in &result.evidence_paths {
+            let evidence = serde_json::json!({
+                "scenario_id": result.id,
+                "outcome": result.outcome,
+                "terminal": result.terminal,
+                "observed_frames": result.observed_frames,
+                "message": result.message,
+            });
+            write_text_output(Path::new(evidence_path), &format!("{evidence}\n"))?;
+        }
+    }
+    if report.results.is_empty() {
+        std::fs::create_dir_all(&plan.artifacts.evidence_dir)?;
+    }
     Ok(())
 }
 

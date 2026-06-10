@@ -170,6 +170,23 @@ jobs:
           }
 
           cargo run -p nnrp-conformance-runner -- `
+            wire-run `
+            --plan artifacts/wire-conformance-plan.ci.json `
+            --target docs/examples/wire-conformance-target.sample.json `
+            --output artifacts/wire-conformance-results.ci.json
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          cargo run -p nnrp-conformance-runner -- `
+            validate-wire-results `
+            --plan artifacts/wire-conformance-plan.ci.json `
+            --results artifacts/wire-conformance-results.ci.json
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          cargo run -p nnrp-conformance-runner -- `
             validate-wire-results `
             --plan docs/examples/wire-conformance-execution-plan.sample.json `
             --results docs/examples/wire-conformance-case-results.sample.json
