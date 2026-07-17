@@ -3,6 +3,25 @@
   "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-scenario.schema.json",
   "title": "NNRP Wire-level Conformance Scenario Manifest",
   "type": "object",
+  "$defs": {
+    "unsignedDecimalU64": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "cacheIdentity": {
+      "type": "object",
+      "required": ["cache_namespace", "cache_key_hi", "cache_key_lo"],
+      "properties": {
+        "cache_namespace": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "cache_key_hi": {"$ref": "#/$defs/unsignedDecimalU64"},
+        "cache_key_lo": {"$ref": "#/$defs/unsignedDecimalU64"}
+      }
+    }
+  },
   "required": ["protocol_version", "manifest_name", "scenarios"],
   "properties": {
     "$schema": {
@@ -87,6 +106,46 @@
                   "minimum": 0
                 }
               },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "frame": {
+                        "enum": [
+                          "CACHE_PUT",
+                          "CACHE_ACK",
+                          "CACHE_INVALIDATE",
+                          "CACHE_REFERENCE",
+                          "CACHE_MISS"
+                        ]
+                      }
+                    },
+                    "required": ["frame"]
+                  },
+                  "then": {
+                    "required": ["payload"],
+                    "properties": {
+                      "payload": {"$ref": "#/$defs/cacheIdentity"}
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {"frame": {"const": "CACHE_MISS"}},
+                    "required": ["frame"]
+                  },
+                  "then": {
+                    "properties": {
+                      "payload": {
+                        "required": ["miss_reason"],
+                        "properties": {
+                          "miss_reason": {"type": "string", "minLength": 1}
+                        }
+                      }
+                    }
+                  }
+                }
+              ],
               "additionalProperties": false
             },
             "minItems": 1

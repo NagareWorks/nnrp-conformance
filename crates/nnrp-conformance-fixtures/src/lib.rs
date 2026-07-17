@@ -1119,6 +1119,23 @@ mod tests {
                     .iter()
                     .any(|scenario| scenario.feature == "control.cancel_abort")
             );
+
+            let cache_scenario = scenarios
+                .scenarios
+                .iter()
+                .find(|scenario| scenario.feature == "control.capability_route_cache")
+                .expect("wire suite should include the canonical cache identity scenario");
+            for frame in ["CACHE_REFERENCE", "CACHE_MISS"] {
+                let payload = cache_scenario
+                    .steps
+                    .iter()
+                    .find(|step| step.frame.as_deref() == Some(frame))
+                    .and_then(|step| step.payload.as_ref())
+                    .unwrap_or_else(|| panic!("{frame} should declare its cache identity"));
+                assert_eq!(payload["cache_namespace"], 1);
+                assert_eq!(payload["cache_key_hi"], "1234605616436508552");
+                assert_eq!(payload["cache_key_lo"], "11072869122414935808");
+            }
         }
     }
 
@@ -1203,7 +1220,7 @@ mod tests {
                 .expect("preview4 semantic vectors should generate");
 
         assert_eq!(vector_manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(vector_manifest.vectors.len(), 16);
+        assert_eq!(vector_manifest.vectors.len(), 22);
 
         let cancel = vector_manifest
             .vectors
@@ -1220,6 +1237,106 @@ mod tests {
             .expect("object delta vector should exist");
         assert_eq!(object_delta.kind, "object_frame");
         assert_eq!(object_delta.bytes, 4);
+
+        let expected_cache_vectors = [
+            (
+                "preview4.object_reference.camera_block",
+                "object_reference",
+                24,
+                "0100030001000000887766554433221100ffeeddccbbaa99",
+            ),
+            (
+                "preview4.cache_put.camera_block",
+                "cache_put_metadata",
+                40,
+                "0100000001000000887766554433221100ffeeddccbbaa99983a0000000800000300000003000000",
+            ),
+            (
+                "preview4.cache_ack.camera_block",
+                "cache_ack_metadata",
+                40,
+                "0100000000000000887766554433221100ffeeddccbbaa99983a0000002000000000000000000000",
+            ),
+            (
+                "preview4.cache_invalidate.object_key",
+                "cache_invalidate_metadata",
+                32,
+                "0300000001000000887766554433221100ffeeddccbbaa990200000000000000",
+            ),
+            (
+                "preview4.cache_reference.runtime_object",
+                "cache_reference_metadata",
+                56,
+                "0100000002010100887766554433221100ffeeddccbbaa990807060504030201181716151413121130750000000000000300000000000000",
+            ),
+            (
+                "preview4.cache_miss.not_found",
+                "cache_miss_metadata",
+                32,
+                "0100000002010100887766554433221100ffeeddccbbaa990000000000000000",
+            ),
+        ];
+        for (name, kind, bytes, hex) in expected_cache_vectors {
+            let vector = vector_manifest
+                .vectors
+                .iter()
+                .find(|vector| vector.name == name)
+                .unwrap_or_else(|| panic!("missing canonical cache vector {name}"));
+            assert_eq!(vector.kind, kind);
+            assert_eq!(vector.bytes, bytes);
+            assert_eq!(vector.hex, hex);
+        }
+    }
+
+    #[test]
+    fn preview4_cache_vectors_reject_lossy_or_noncanonical_identities() {
+        let numeric_key = serde_json::json!({
+            "protocol_version": "nnrp-1-preview4",
+            "vectors": [{
+                "recipe_type": "cache_miss_metadata_v4",
+                "name": "bad.numeric-key",
+                "description": "invalid",
+                "cache_namespace": 1,
+                "profile_id": 258,
+                "miss_reason": "not_found",
+                "cache_key_hi": 1234605616436508552_u64,
+                "cache_key_lo": "11072869122414935808",
+                "diagnostic_bytes": 0
+            }]
+        });
+        assert!(serde_json::from_value::<SemanticVectorManifest>(numeric_key).is_err());
+
+        let leading_zero_key = serde_json::json!({
+            "protocol_version": "nnrp-1-preview4",
+            "vectors": [{
+                "recipe_type": "cache_miss_metadata_v4",
+                "name": "bad.leading-zero-key",
+                "description": "invalid",
+                "cache_namespace": 1,
+                "profile_id": 258,
+                "miss_reason": "not_found",
+                "cache_key_hi": "01",
+                "cache_key_lo": "2",
+                "diagnostic_bytes": 0
+            }]
+        });
+        assert!(serde_json::from_value::<SemanticVectorManifest>(leading_zero_key).is_err());
+
+        let invalid_scope: SemanticVectorManifest = serde_json::from_value(serde_json::json!({
+            "protocol_version": "nnrp-1-preview4",
+            "vectors": [{
+                "recipe_type": "cache_invalidate_metadata_v4",
+                "name": "bad.namespace-scope",
+                "description": "invalid",
+                "invalidate_scope": "namespace",
+                "cache_namespace": 1,
+                "cache_key_hi": "2",
+                "cache_key_lo": "0",
+                "reason_code": 0
+            }]
+        }))
+        .expect("invalid scope fields should remain syntactically parseable");
+        assert!(build_vector_manifest(&invalid_scope, "inline").is_err());
     }
 
     #[test]

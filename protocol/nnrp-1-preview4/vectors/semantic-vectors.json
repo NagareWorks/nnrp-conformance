@@ -113,6 +113,77 @@
       "description": "Preview4 drop reason for backpressure.",
       "kind": "result_drop_reason",
       "value": 393219
+    },
+    {
+      "recipe_type": "object_reference_block_v4",
+      "name": "preview4.object_reference.camera_block",
+      "description": "Preview4 hot-path object reference with the canonical namespace and 128-bit cache key.",
+      "object_kind": "camera_block",
+      "ref_flags": 3,
+      "cache_namespace": 1,
+      "cache_key_hi": "1234605616436508552",
+      "cache_key_lo": "11072869122414935808"
+    },
+    {
+      "recipe_type": "cache_put_metadata_v4",
+      "name": "preview4.cache_put.camera_block",
+      "description": "Preview4 cache put metadata with the canonical cache identity.",
+      "cache_namespace": 1,
+      "object_kind": "camera_block",
+      "cache_key_hi": "1234605616436508552",
+      "cache_key_lo": "11072869122414935808",
+      "ttl_ms": 15000,
+      "object_bytes": 2048,
+      "codec_bitmap": 3,
+      "flags": 3
+    },
+    {
+      "recipe_type": "cache_ack_metadata_v4",
+      "name": "preview4.cache_ack.camera_block",
+      "description": "Preview4 cache acknowledgement for the same canonical cache identity.",
+      "cache_namespace": 1,
+      "status": "accepted",
+      "cache_key_hi": "1234605616436508552",
+      "cache_key_lo": "11072869122414935808",
+      "accepted_ttl_ms": 15000,
+      "max_object_bytes": 8192,
+      "detail_code": 0
+    },
+    {
+      "recipe_type": "cache_invalidate_metadata_v4",
+      "name": "preview4.cache_invalidate.object_key",
+      "description": "Preview4 object-key invalidation using the complete canonical cache identity.",
+      "invalidate_scope": "object_key",
+      "cache_namespace": 1,
+      "cache_key_hi": "1234605616436508552",
+      "cache_key_lo": "11072869122414935808",
+      "reason_code": 2
+    },
+    {
+      "recipe_type": "cache_reference_metadata_v4",
+      "name": "preview4.cache_reference.runtime_object",
+      "description": "Preview4 cache reference metadata preserving the full cache identity and lease anchors.",
+      "cache_namespace": 1,
+      "profile_id": 258,
+      "reuse_scope": "session",
+      "cache_key_hi": "1234605616436508552",
+      "cache_key_lo": "11072869122414935808",
+      "lease_id": "72623859790382856",
+      "producer_trace_id": "1230066625199609624",
+      "expiration_hint_ms": 30000,
+      "metadata_bytes": 0,
+      "flags": 3
+    },
+    {
+      "recipe_type": "cache_miss_metadata_v4",
+      "name": "preview4.cache_miss.not_found",
+      "description": "Preview4 cache miss metadata echoing the complete canonical cache identity.",
+      "cache_namespace": 1,
+      "profile_id": 258,
+      "miss_reason": "not_found",
+      "cache_key_hi": "1234605616436508552",
+      "cache_key_lo": "11072869122414935808",
+      "diagnostic_bytes": 0
     }
   ]
 }

@@ -1,6 +1,33 @@
 use crate::FixtureError;
 use serde::{Deserialize, Serialize};
 
+mod decimal_u64 {
+    use serde::{Deserialize, Deserializer, Serializer, de::Error as _};
+
+    pub fn serialize<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&value.to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        if value.is_empty()
+            || !value.bytes().all(|byte| byte.is_ascii_digit())
+            || (value.len() > 1 && value.starts_with('0'))
+        {
+            return Err(D::Error::custom(
+                "u64 values must use canonical unsigned decimal strings",
+            ));
+        }
+        value.parse::<u64>().map_err(D::Error::custom)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VectorManifest {
     #[serde(rename = "$schema", default)]
@@ -281,6 +308,85 @@ pub enum SemanticVectorRecipe {
         cache_key_hi: u32,
         cache_key_lo: u32,
     },
+    ObjectReferenceBlockV4 {
+        name: String,
+        description: String,
+        object_kind: CacheObjectKindName,
+        ref_flags: u16,
+        cache_namespace: u32,
+        #[serde(with = "decimal_u64")]
+        cache_key_hi: u64,
+        #[serde(with = "decimal_u64")]
+        cache_key_lo: u64,
+    },
+    CachePutMetadataV4 {
+        name: String,
+        description: String,
+        cache_namespace: u32,
+        object_kind: CacheObjectKindName,
+        #[serde(with = "decimal_u64")]
+        cache_key_hi: u64,
+        #[serde(with = "decimal_u64")]
+        cache_key_lo: u64,
+        ttl_ms: u32,
+        object_bytes: u32,
+        codec_bitmap: u32,
+        flags: u32,
+    },
+    CacheAckMetadataV4 {
+        name: String,
+        description: String,
+        cache_namespace: u32,
+        status: CacheAckStatusName,
+        #[serde(with = "decimal_u64")]
+        cache_key_hi: u64,
+        #[serde(with = "decimal_u64")]
+        cache_key_lo: u64,
+        accepted_ttl_ms: u32,
+        max_object_bytes: u32,
+        detail_code: u32,
+    },
+    CacheInvalidateMetadataV4 {
+        name: String,
+        description: String,
+        invalidate_scope: CacheInvalidateScopeName,
+        cache_namespace: u32,
+        #[serde(with = "decimal_u64")]
+        cache_key_hi: u64,
+        #[serde(with = "decimal_u64")]
+        cache_key_lo: u64,
+        reason_code: u32,
+    },
+    CacheReferenceMetadataV4 {
+        name: String,
+        description: String,
+        cache_namespace: u32,
+        profile_id: u16,
+        reuse_scope: CacheReuseScopeName,
+        #[serde(with = "decimal_u64")]
+        cache_key_hi: u64,
+        #[serde(with = "decimal_u64")]
+        cache_key_lo: u64,
+        #[serde(with = "decimal_u64")]
+        lease_id: u64,
+        #[serde(with = "decimal_u64")]
+        producer_trace_id: u64,
+        expiration_hint_ms: u32,
+        metadata_bytes: u32,
+        flags: u32,
+    },
+    CacheMissMetadataV4 {
+        name: String,
+        description: String,
+        cache_namespace: u32,
+        profile_id: u16,
+        miss_reason: CacheMissReasonName,
+        #[serde(with = "decimal_u64")]
+        cache_key_hi: u64,
+        #[serde(with = "decimal_u64")]
+        cache_key_lo: u64,
+        diagnostic_bytes: u32,
+    },
     TypedPayloadDescriptor {
         name: String,
         description: String,
@@ -494,6 +600,47 @@ pub enum CacheObjectKindName {
     PromptSegment,
     ToolSchema,
     StructuredEventSchema,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheAckStatusName {
+    Accepted,
+    Rejected,
+    Replaced,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheInvalidateScopeName {
+    WholeSession,
+    Namespace,
+    ObjectKind,
+    ObjectKey,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheReuseScopeName {
+    Operation,
+    Session,
+    Connection,
+    Global,
+    Tenant,
+    Profile,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheMissReasonName {
+    Unknown,
+    NotFound,
+    Expired,
+    Invalidated,
+    SchemaMismatch,
+    ProducerUnavailable,
+    LeaseRequired,
+    PermissionDenied,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1202,6 +1349,170 @@ fn render_recipe(
                 payload,
             ))
         }
+        SemanticVectorRecipe::ObjectReferenceBlockV4 {
+            name,
+            description,
+            object_kind,
+            ref_flags,
+            cache_namespace,
+            cache_key_hi,
+            cache_key_lo,
+        } => {
+            let mut payload = Vec::new();
+            push_u16(&mut payload, object_kind.as_u16());
+            push_u16(&mut payload, *ref_flags);
+            push_u32(&mut payload, *cache_namespace);
+            push_u64(&mut payload, *cache_key_hi);
+            push_u64(&mut payload, *cache_key_lo);
+            Ok((
+                name.clone(),
+                "object_reference".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::CachePutMetadataV4 {
+            name,
+            description,
+            cache_namespace,
+            object_kind,
+            cache_key_hi,
+            cache_key_lo,
+            ttl_ms,
+            object_bytes,
+            codec_bitmap,
+            flags,
+        } => {
+            let mut payload = Vec::new();
+            push_u32(&mut payload, *cache_namespace);
+            push_u32(&mut payload, object_kind.as_u32());
+            push_u64(&mut payload, *cache_key_hi);
+            push_u64(&mut payload, *cache_key_lo);
+            push_u32(&mut payload, *ttl_ms);
+            push_u32(&mut payload, *object_bytes);
+            push_u32(&mut payload, *codec_bitmap);
+            push_u32(&mut payload, *flags);
+            Ok((
+                name.clone(),
+                "cache_put_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::CacheAckMetadataV4 {
+            name,
+            description,
+            cache_namespace,
+            status,
+            cache_key_hi,
+            cache_key_lo,
+            accepted_ttl_ms,
+            max_object_bytes,
+            detail_code,
+        } => {
+            let mut payload = Vec::new();
+            push_u32(&mut payload, *cache_namespace);
+            push_u32(&mut payload, status.as_u32());
+            push_u64(&mut payload, *cache_key_hi);
+            push_u64(&mut payload, *cache_key_lo);
+            push_u32(&mut payload, *accepted_ttl_ms);
+            push_u32(&mut payload, *max_object_bytes);
+            push_u32(&mut payload, *detail_code);
+            push_u32(&mut payload, 0);
+            Ok((
+                name.clone(),
+                "cache_ack_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::CacheInvalidateMetadataV4 {
+            name,
+            description,
+            invalidate_scope,
+            cache_namespace,
+            cache_key_hi,
+            cache_key_lo,
+            reason_code,
+        } => {
+            validate_cache_invalidate_identity(
+                *invalidate_scope,
+                *cache_namespace,
+                *cache_key_hi,
+                *cache_key_lo,
+            )?;
+            let mut payload = Vec::new();
+            push_u32(&mut payload, invalidate_scope.as_u32());
+            push_u32(&mut payload, *cache_namespace);
+            push_u64(&mut payload, *cache_key_hi);
+            push_u64(&mut payload, *cache_key_lo);
+            push_u32(&mut payload, *reason_code);
+            push_u32(&mut payload, 0);
+            Ok((
+                name.clone(),
+                "cache_invalidate_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::CacheReferenceMetadataV4 {
+            name,
+            description,
+            cache_namespace,
+            profile_id,
+            reuse_scope,
+            cache_key_hi,
+            cache_key_lo,
+            lease_id,
+            producer_trace_id,
+            expiration_hint_ms,
+            metadata_bytes,
+            flags,
+        } => {
+            let mut payload = Vec::new();
+            push_u32(&mut payload, *cache_namespace);
+            push_u16(&mut payload, *profile_id);
+            push_u16(&mut payload, reuse_scope.as_u16());
+            push_u64(&mut payload, *cache_key_hi);
+            push_u64(&mut payload, *cache_key_lo);
+            push_u64(&mut payload, *lease_id);
+            push_u64(&mut payload, *producer_trace_id);
+            push_u32(&mut payload, *expiration_hint_ms);
+            push_u32(&mut payload, *metadata_bytes);
+            push_u32(&mut payload, *flags);
+            push_u32(&mut payload, 0);
+            Ok((
+                name.clone(),
+                "cache_reference_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::CacheMissMetadataV4 {
+            name,
+            description,
+            cache_namespace,
+            profile_id,
+            miss_reason,
+            cache_key_hi,
+            cache_key_lo,
+            diagnostic_bytes,
+        } => {
+            let mut payload = Vec::new();
+            push_u32(&mut payload, *cache_namespace);
+            push_u16(&mut payload, *profile_id);
+            push_u16(&mut payload, miss_reason.as_u16());
+            push_u64(&mut payload, *cache_key_hi);
+            push_u64(&mut payload, *cache_key_lo);
+            push_u32(&mut payload, *diagnostic_bytes);
+            push_u32(&mut payload, 0);
+            Ok((
+                name.clone(),
+                "cache_miss_metadata".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
         SemanticVectorRecipe::TypedPayloadDescriptor {
             name,
             description,
@@ -1338,6 +1649,31 @@ fn push_u32(buffer: &mut Vec<u8>, value: u32) {
 
 fn push_u64(buffer: &mut Vec<u8>, value: u64) {
     buffer.extend_from_slice(&value.to_le_bytes());
+}
+
+fn validate_cache_invalidate_identity(
+    scope: CacheInvalidateScopeName,
+    cache_namespace: u32,
+    cache_key_hi: u64,
+    cache_key_lo: u64,
+) -> Result<(), FixtureError> {
+    let valid = match scope {
+        CacheInvalidateScopeName::WholeSession => {
+            cache_namespace == 0 && cache_key_hi == 0 && cache_key_lo == 0
+        }
+        CacheInvalidateScopeName::Namespace => cache_key_hi == 0 && cache_key_lo == 0,
+        CacheInvalidateScopeName::ObjectKind => {
+            cache_key_hi <= u64::from(u32::MAX) && cache_key_lo == 0
+        }
+        CacheInvalidateScopeName::ObjectKey => true,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(FixtureError::Validation {
+            message: "cache invalidate identity fields must match invalidate_scope".to_string(),
+        })
+    }
 }
 
 fn header_flags(flags: &[HeaderFlagName]) -> u32 {
@@ -1613,6 +1949,59 @@ impl CacheObjectKindName {
             Self::PromptSegment => 0x0007,
             Self::ToolSchema => 0x0008,
             Self::StructuredEventSchema => 0x0009,
+        }
+    }
+
+    fn as_u32(self) -> u32 {
+        u32::from(self.as_u16())
+    }
+}
+
+impl CacheAckStatusName {
+    fn as_u32(self) -> u32 {
+        match self {
+            Self::Accepted => 0,
+            Self::Rejected => 1,
+            Self::Replaced => 2,
+        }
+    }
+}
+
+impl CacheInvalidateScopeName {
+    fn as_u32(self) -> u32 {
+        match self {
+            Self::WholeSession => 0,
+            Self::Namespace => 1,
+            Self::ObjectKind => 2,
+            Self::ObjectKey => 3,
+        }
+    }
+}
+
+impl CacheReuseScopeName {
+    fn as_u16(self) -> u16 {
+        match self {
+            Self::Operation => 0,
+            Self::Session => 1,
+            Self::Connection => 2,
+            Self::Global => 3,
+            Self::Tenant => 4,
+            Self::Profile => 5,
+        }
+    }
+}
+
+impl CacheMissReasonName {
+    fn as_u16(self) -> u16 {
+        match self {
+            Self::Unknown => 0,
+            Self::NotFound => 1,
+            Self::Expired => 2,
+            Self::Invalidated => 3,
+            Self::SchemaMismatch => 4,
+            Self::ProducerUnavailable => 5,
+            Self::LeaseRequired => 6,
+            Self::PermissionDenied => 7,
         }
     }
 }

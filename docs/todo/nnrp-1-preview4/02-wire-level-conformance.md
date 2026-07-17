@@ -18,6 +18,8 @@ NNRP frames directly.
 - [x] Implement the runner that can drive the suite-owned TCP, QUIC, IPC, and WebSocket reference endpoint path directly.
 - [x] Add timeout, close, backpressure, and frame-order injection evidence in proxy mode.
 - [x] Add CI examples that run against the local reference endpoint path.
+- [x] Validate that cache-reference scenarios preserve `cache_namespace`, `cache_key_hi`, and
+      `cache_key_lo` without collapsing the 128-bit key into a text alias.
 
 ## Exit criteria
 

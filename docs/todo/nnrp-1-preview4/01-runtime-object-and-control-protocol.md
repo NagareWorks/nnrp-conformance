@@ -11,7 +11,8 @@ and control semantics.
 - [x] Define the preview4 runtime object capability catalog.
 - [x] Keep cache reference as an optional object-lifecycle strategy rather than a universal latency
       promise.
-- [x] Add canonical semantic vectors for the listed control and runtime object frames.
+- [x] Add canonical semantic vectors for the listed control and runtime object frames, including the
+      shared cache namespace and 128-bit cache identity across hot-path and control-plane layouts.
 - [x] Split the listed capability tokens into mandatory, optional, and experimental groups.
 
 ## Exit criteria

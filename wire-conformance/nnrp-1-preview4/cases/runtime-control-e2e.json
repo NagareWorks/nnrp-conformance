@@ -172,12 +172,20 @@
           "action": "send",
           "frame": "CACHE_REFERENCE",
           "payload": {
-            "cache_key": "ctx-1"
+            "cache_namespace": 1,
+            "cache_key_hi": "1234605616436508552",
+            "cache_key_lo": "11072869122414935808"
           }
         },
         {
           "action": "receive",
           "frame": "CACHE_MISS",
+          "payload": {
+            "cache_namespace": 1,
+            "cache_key_hi": "1234605616436508552",
+            "cache_key_lo": "11072869122414935808",
+            "miss_reason": "not_found"
+          },
           "timeout_ms": 1000
         }
       ],
