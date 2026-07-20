@@ -82,7 +82,8 @@
       "metrics": {
         "throughput_ops_per_sec": 125000.0,
         "cpu_percent": 88.0,
-        "peak_memory_bytes": 56623104
+        "peak_memory_bytes": 56623104,
+        "native_ffi_calls_per_op": 4.0
       }
     },
     {

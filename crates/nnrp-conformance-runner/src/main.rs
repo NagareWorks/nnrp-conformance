@@ -762,6 +762,7 @@ mod tests {
         BenchmarkScenario, BenchmarkScenarioResult, BenchmarkWorkload, CaseLayer, CaseStatus,
     };
     use nnrp_conformance_runner::WireExternalExecutionSummary;
+    use std::collections::BTreeMap;
 
     fn sample_plan() -> AdapterExecutionPlan {
         AdapterExecutionPlan {
@@ -955,6 +956,7 @@ mod tests {
                             cpu_percent: None,
                             peak_memory_bytes: None,
                             gc_alloc_bytes: None,
+                            extensions: BTreeMap::new(),
                         }),
                         message: None,
                         evidence_paths: vec![],

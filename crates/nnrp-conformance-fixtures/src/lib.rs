@@ -222,6 +222,8 @@ pub struct BenchmarkMetrics {
     pub peak_memory_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gc_alloc_bytes: Option<u64>,
+    #[serde(flatten)]
+    pub extensions: BTreeMap<String, f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -936,6 +938,15 @@ mod tests {
         assert_eq!(report.protocol_version, "nnrp-1-preview3");
         assert_eq!(report.results.len(), 9);
         assert_eq!(report.environment.os, "linux");
+        assert_eq!(
+            report.results[6]
+                .metrics
+                .as_ref()
+                .expect("throughput result should contain metrics")
+                .extensions
+                .get("native_ffi_calls_per_op"),
+            Some(&4.0)
+        );
     }
 
     #[test]

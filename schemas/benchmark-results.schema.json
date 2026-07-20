@@ -116,7 +116,9 @@
                 "minimum": 0
               }
             },
-            "additionalProperties": false
+            "additionalProperties": {
+              "type": "number"
+            }
           },
           "message": {
             "type": "string"

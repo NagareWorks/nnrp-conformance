@@ -170,6 +170,7 @@ cargo run -p nnrp-conformance-runner -- \
 ```
 
 Benchmark results are informational. They are intended for pre/post migration comparisons and steady-state regression tracking, not for protocol correctness gating.
+The result schema reserves common latency, throughput, CPU, and memory names while allowing additional numeric metrics such as FFI calls per operation or allocation counts. SDK-specific text and structured evidence belong in environment notes or evidence files rather than metric values.
 
 Validate the published JSON artifacts for an explicit baseline against the suite-owned schemas:
 
