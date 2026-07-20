@@ -14,10 +14,10 @@ version = "0.1.0"
 [workspace.dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.38", features = ["derive"] }
-nnrp-conformance = "=1.0.0-preview.4.6"
-nnrp-core = "=1.0.0-preview.4.6"
-nnrp-runtime = "=1.0.0-preview.4.6"
-nnrp-transport-quic = "=1.0.0-preview.4.6"
+nnrp-conformance = "=1.0.0-preview.4.7"
+nnrp-core = "=1.0.0-preview.4.7"
+nnrp-runtime = "=1.0.0-preview.4.7"
+nnrp-transport-quic = "=1.0.0-preview.4.7"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 thiserror = "2.0.17"

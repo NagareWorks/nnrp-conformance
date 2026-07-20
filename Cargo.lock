@@ -595,9 +595,9 @@ dependencies = [
 
 [[package]]
 name = "nnrp-conformance"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af33f3370612c0828e1d8a49f876c291f54ef2ae67de7d393ad4a252951889a0"
+checksum = "e50c9580a1843a643a12222d3bf35ab74c5cd876511f9359520e8d4db8565ac5"
 dependencies = [
  "http",
  "nnrp-core",
@@ -639,18 +639,18 @@ dependencies = [
 
 [[package]]
 name = "nnrp-core"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "547063764ca6e7e1f8ed38ccb73ebca7caada003001323ca753112d680dcddd8"
+checksum = "6adbe54af9318418b5f63a9b215856a281f545bd78d6fbc234cb32f6a208c85e"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "nnrp-ffi"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d70bbaba37f5b39cafa7d83fc5489997ae81bf6972f269e2e31dd3f1d5cde7b"
+checksum = "792a00570dcb099ebcd7b14ddca874105a3b6a4ebfd58686cb754fb0170a9d66"
 dependencies = [
  "async-trait",
  "http",
@@ -663,9 +663,9 @@ dependencies = [
 
 [[package]]
 name = "nnrp-runtime"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbd8b69c84dfe7a73f26e13eeb854ff8c2b7e9cd5acfaef8e748f0b8a5629f82"
+checksum = "0a911082d0ff278318560510d950a0d05257ab78762ccf9e6dbff75981a9b498"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -675,9 +675,9 @@ dependencies = [
 
 [[package]]
 name = "nnrp-transport-ipc"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba1be11419ecec3a21c7e9ba15b63e2fdbd2c7571137f4f22f0df50163744d04"
+checksum = "781b139b92a4b9d6eabbd1487dffc0b2c0ff0a9a66959d4b520db91983f4b004"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -688,9 +688,9 @@ dependencies = [
 
 [[package]]
 name = "nnrp-transport-provider"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55351e1ecb978030f647b683ef2504cbe4832002bd6e003178a811fbba4f6571"
+checksum = "009d23a1df0f2ffcc3e8cd21df057f37b1277cf9c502456553fbd0d5d171948c"
 dependencies = [
  "nnrp-core",
  "thiserror",
@@ -698,9 +698,9 @@ dependencies = [
 
 [[package]]
 name = "nnrp-transport-quic"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "671995166e770f8f9487fa270928a90a7791ed9f908450811e3b42d9b1927314"
+checksum = "ae7468c32cd687528211b916c7e8289a299ee988f5ea0a1882bc54b61f4e59a9"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -715,9 +715,9 @@ dependencies = [
 
 [[package]]
 name = "nnrp-transport-tcp"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8771c3bf8a1eb70d7434579c2886e68a0817486de5b852ef3c5bdf271cb7fdf0"
+checksum = "31f8d01c4f41a2dd1b99c4e8676f3e9a6eee699c85a26b6e4ca5b46694269f37"
 dependencies = [
  "nnrp-core",
  "nnrp-runtime",
@@ -727,9 +727,9 @@ dependencies = [
 
 [[package]]
 name = "nnrp-transport-websocket"
-version = "1.0.0-preview.4.6"
+version = "1.0.0-preview.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "893e26c67661614da9dcb41c4ede9c316c3eee84664fccd1a212eceb09d4490a"
+checksum = "0117d2ef6442904fc89f0190460c5cc56d4e7ae13777065d9d798df7cac85e69"
 dependencies = [
  "async-trait",
  "futures-util",
