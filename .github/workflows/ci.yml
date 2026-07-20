@@ -160,31 +160,7 @@ jobs:
       - name: Validate wire conformance examples
         shell: pwsh
         run: |
-          cargo run -p nnrp-conformance-runner -- `
-            wire-plan `
-            --suite wire-conformance/nnrp-1-preview4/manifest.json `
-            --target docs/examples/wire-conformance-target.sample.json `
-            --output artifacts/wire-conformance-plan.ci.json
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-          cargo run -p nnrp-conformance-runner -- `
-            wire-run `
-            --plan artifacts/wire-conformance-plan.ci.json `
-            --target docs/examples/wire-conformance-target.sample.json `
-            --output artifacts/wire-conformance-results.ci.json
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-          cargo run -p nnrp-conformance-runner -- `
-            validate-wire-results `
-            --plan artifacts/wire-conformance-plan.ci.json `
-            --results artifacts/wire-conformance-results.ci.json
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          ./scripts/run_wire_e2e.ps1 -ArtifactDirectory artifacts/wire-e2e-ci
 
           cargo run -p nnrp-conformance-runner -- `
             validate-wire-results `
@@ -193,6 +169,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
+
+      - name: Upload wire conformance evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: wire-conformance-e2e
+          path: artifacts/wire-e2e-ci
+          if-no-files-found: error
 
   verify-baselines:
     name: verify-${{ matrix.baseline_id }}

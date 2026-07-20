@@ -446,6 +446,16 @@ pub struct WireConformanceTransportEndpoint {
     pub name: WireConformanceTransport,
     pub endpoint: String,
     pub tls: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub security: Option<WireConformanceTransportSecurity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireConformanceTransportSecurity {
+    pub server_name: String,
+    pub trusted_certificate_der_path: String,
+    pub certificate_der_path: String,
+    pub private_key_pkcs8_der_path: String,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1049,6 +1059,27 @@ mod tests {
         assert!(transport_names.contains(&WireConformanceTransport::Quic));
         assert!(transport_names.contains(&WireConformanceTransport::Ipc));
         assert!(transport_names.contains(&WireConformanceTransport::Websocket));
+        let quic = manifest
+            .wire_conformance
+            .transports
+            .iter()
+            .find(|transport| transport.name == WireConformanceTransport::Quic)
+            .expect("wire target example should declare QUIC");
+        let quic_security = quic
+            .security
+            .as_ref()
+            .expect("TLS-enabled QUIC endpoint should declare security material");
+        assert!(quic.tls);
+        assert_eq!(quic_security.server_name, "localhost");
+        assert_eq!(
+            quic_security.trusted_certificate_der_path,
+            "certs/server.der"
+        );
+        assert_eq!(quic_security.certificate_der_path, "certs/server.der");
+        assert_eq!(
+            quic_security.private_key_pkcs8_der_path,
+            "certs/server-key.der"
+        );
         assert!(
             manifest
                 .wire_conformance

@@ -83,8 +83,8 @@ The suite-owned public JSON files for preview4 wire-level execution live at:
 8. `docs/examples/wire-conformance-case-results.sample.json`
 
 The wire-level contract is documented in `docs/wire-level-conformance.md`. Preview4 freezes TCP,
-QUIC, IPC, and WebSocket as target transports, while live endpoint driving remains a transport
-implementation task.
+QUIC, IPC, and WebSocket as target transports. The runner drives live target endpoints directly,
+and CI verifies all six frozen scenarios against a separately launched reference target process.
 
 ## Third-Party Implementation Integration
 
@@ -222,6 +222,12 @@ cargo run -p nnrp-conformance-runner -- \
   validate-wire-results \
   --plan docs/examples/wire-conformance-execution-plan.sample.json \
   --results docs/examples/wire-conformance-case-results.sample.json
+```
+
+Run the independent-process preview4 wire E2E locally:
+
+```powershell
+./scripts/run_wire_e2e.ps1 -ArtifactDirectory artifacts/wire-e2e-local
 ```
 
 ## CI Contract

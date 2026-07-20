@@ -18,7 +18,13 @@
       {
         "name": "quic",
         "endpoint": "127.0.0.1:19092",
-        "tls": false
+        "tls": true,
+        "security": {
+          "server_name": "localhost",
+          "trusted_certificate_der_path": "certs/server.der",
+          "certificate_der_path": "certs/server.der",
+          "private_key_pkcs8_der_path": "certs/server-key.der"
+        }
       },
       {
         "name": "ipc",

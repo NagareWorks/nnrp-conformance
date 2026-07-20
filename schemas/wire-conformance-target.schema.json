@@ -3,6 +3,24 @@
   "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-target.schema.json",
   "title": "NNRP Wire-level Conformance Target Manifest",
   "type": "object",
+  "$defs": {
+    "transportSecurity": {
+      "type": "object",
+      "required": [
+        "server_name",
+        "trusted_certificate_der_path",
+        "certificate_der_path",
+        "private_key_pkcs8_der_path"
+      ],
+      "properties": {
+        "server_name": {"type": "string", "minLength": 1},
+        "trusted_certificate_der_path": {"type": "string", "minLength": 1},
+        "certificate_der_path": {"type": "string", "minLength": 1},
+        "private_key_pkcs8_der_path": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
   "required": ["target_name", "protocol_version", "suite_version", "wire_conformance"],
   "properties": {
     "$schema": {
@@ -49,8 +67,54 @@
               },
               "tls": {
                 "type": "boolean"
+              },
+              "security": {
+                "$ref": "#/$defs/transportSecurity"
               }
             },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {"tls": {"const": true}},
+                  "required": ["tls"]
+                },
+                "then": {"required": ["security"]},
+                "else": {"not": {"required": ["security"]}}
+              },
+              {
+                "if": {
+                  "properties": {"name": {"const": "quic"}},
+                  "required": ["name"]
+                },
+                "then": {"properties": {"tls": {"const": true}}}
+              },
+              {
+                "if": {
+                  "properties": {"name": {"enum": ["tcp", "ipc"]}},
+                  "required": ["name"]
+                },
+                "then": {"properties": {"tls": {"const": false}}}
+              },
+              {
+                "if": {
+                  "properties": {"name": {"const": "websocket"}},
+                  "required": ["name"]
+                },
+                "then": {
+                  "properties": {"endpoint": {"pattern": "^wss?://"}},
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {"endpoint": {"pattern": "^wss://"}},
+                        "required": ["endpoint"]
+                      },
+                      "then": {"properties": {"tls": {"const": true}}},
+                      "else": {"properties": {"tls": {"const": false}}}
+                    }
+                  ]
+                }
+              }
+            ],
             "additionalProperties": false
           },
           "minItems": 1

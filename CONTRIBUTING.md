@@ -71,6 +71,7 @@ Before opening or merging a PR, prefer the narrowest validation that proves the 
 - `cargo run -p nnrp-conformance-runner -- summary --protocol protocol/<protocol-version>/manifest.json --capabilities protocol/<protocol-version>/example-capabilities.json` when changing baseline selection, manifests, or report shape
 - `cargo run -p nnrp-conformance-runner -- generate-vectors --recipe protocol/<protocol-version>/vectors/semantic-vectors.json --output artifacts/<protocol-version>-vectors.json` and `verify-vectors --recipe ... --manifest ...` when changing recipe-backed vector generation
 - `cargo run -p nnrp-conformance-runner -- validate-adapter-results --plan <adapter-plan> --results <adapter-results>` when changing adapter result validation or the suite-owned action
+- `./scripts/run_wire_e2e.ps1 -ArtifactDirectory artifacts/wire-e2e-local` when changing wire scenarios, target manifests, transport security, or external runner behavior
 
 PRs that affect CI, schemas, manifest contracts, or future adapter integration should include the exact command or workflow path used for validation.
 

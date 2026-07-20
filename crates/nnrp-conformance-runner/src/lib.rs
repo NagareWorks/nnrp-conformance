@@ -1,3 +1,10 @@
+use nnrp_conformance::wire_endpoint::{
+    ReferenceTransport, WireEndpointSecurity, WireReferenceEndpoint,
+};
+use nnrp_conformance::wire_external::{
+    WireExternalCase, WireExternalCaseReport, WireExternalDirection, WireExternalFrame,
+    WireExternalMode, WireExternalTerminal, run_wire_external_case,
+};
 use nnrp_conformance_fixtures::{
     AdapterArtifactContext, AdapterExecutionCase, AdapterExecutionPlan,
     ApiProfileCapabilityManifest, ApiProfileCaseOutcome, ApiProfileCaseResultReport,
@@ -12,6 +19,7 @@ use nnrp_conformance_fixtures::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::time::Duration;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum CaseSelection {
@@ -37,7 +45,7 @@ pub struct WireConformanceValidationSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct WireReferenceExecutionSummary {
+pub struct WireExternalExecutionSummary {
     pub selected_scenarios: usize,
     pub passed_scenarios: usize,
     pub failed_scenarios: usize,
@@ -285,6 +293,9 @@ pub fn build_wire_conformance_execution_plan(
     scenarios: &[WireConformanceScenario],
     artifacts: AdapterArtifactContext,
 ) -> Result<WireConformanceExecutionPlan, FixtureError> {
+    for endpoint in &target_manifest.wire_conformance.transports {
+        validate_wire_transport_endpoint(endpoint)?;
+    }
     let target_modes = target_manifest
         .wire_conformance
         .modes
@@ -328,6 +339,56 @@ pub fn build_wire_conformance_execution_plan(
         artifacts,
         scenarios: selected_scenarios,
     })
+}
+
+fn validate_wire_transport_endpoint(
+    endpoint: &nnrp_conformance_fixtures::WireConformanceTransportEndpoint,
+) -> Result<(), FixtureError> {
+    use nnrp_conformance_fixtures::WireConformanceTransport;
+
+    if endpoint.endpoint.is_empty() {
+        return Err(FixtureError::Validation {
+            message: format!("{:?} wire endpoint must not be empty", endpoint.name),
+        });
+    }
+    let requires_security = match endpoint.name {
+        WireConformanceTransport::Tcp | WireConformanceTransport::Ipc => false,
+        WireConformanceTransport::Quic => true,
+        WireConformanceTransport::Websocket => {
+            if endpoint.endpoint.starts_with("wss://") {
+                true
+            } else if endpoint.endpoint.starts_with("ws://") {
+                false
+            } else {
+                return Err(FixtureError::Validation {
+                    message: "WebSocket wire endpoint must use ws:// or wss://".to_string(),
+                });
+            }
+        }
+    };
+    if endpoint.tls != requires_security || endpoint.security.is_some() != requires_security {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "{:?} wire endpoint TLS flag and security material do not match its transport contract",
+                endpoint.name
+            ),
+        });
+    }
+    if let Some(security) = &endpoint.security {
+        if security.server_name.is_empty()
+            || security.trusted_certificate_der_path.is_empty()
+            || security.certificate_der_path.is_empty()
+            || security.private_key_pkcs8_der_path.is_empty()
+        {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "{:?} wire endpoint security fields must not be empty",
+                    endpoint.name
+                ),
+            });
+        }
+    }
+    Ok(())
 }
 
 pub fn validate_wire_conformance_results(
@@ -434,15 +495,19 @@ pub fn validate_wire_conformance_results(
     Ok(summary)
 }
 
-pub fn run_wire_conformance_reference(
+pub async fn run_wire_conformance_external(
     plan: &WireConformanceExecutionPlan,
     target_manifest: &WireConformanceTargetManifest,
+    target_manifest_path: &Path,
 ) -> Result<WireConformanceCaseResultReport, FixtureError> {
     validate_wire_plan_target_alignment(plan, target_manifest)?;
 
     let mut results = Vec::with_capacity(plan.scenarios.len());
     for scenario in &plan.scenarios {
-        results.push(run_wire_reference_scenario(plan, target_manifest, scenario));
+        results.push(
+            run_wire_external_scenario(plan, target_manifest, target_manifest_path, scenario)
+                .await?,
+        );
     }
 
     Ok(WireConformanceCaseResultReport {
@@ -457,10 +522,10 @@ pub fn run_wire_conformance_reference(
     })
 }
 
-pub fn summarize_wire_reference_report(
+pub fn summarize_wire_external_report(
     report: &WireConformanceCaseResultReport,
-) -> WireReferenceExecutionSummary {
-    let mut summary = WireReferenceExecutionSummary {
+) -> WireExternalExecutionSummary {
+    let mut summary = WireExternalExecutionSummary {
         selected_scenarios: report.results.len(),
         passed_scenarios: 0,
         failed_scenarios: 0,
@@ -507,85 +572,235 @@ fn validate_wire_plan_target_alignment(
     Ok(())
 }
 
-fn run_wire_reference_scenario(
+async fn run_wire_external_scenario(
     plan: &WireConformanceExecutionPlan,
     target_manifest: &WireConformanceTargetManifest,
+    target_manifest_path: &Path,
     scenario: &WireConformanceScenario,
-) -> WireConformanceCaseResult {
-    let Some(endpoint) = target_manifest
+) -> Result<WireConformanceCaseResult, FixtureError> {
+    let endpoint_manifest = target_manifest
         .wire_conformance
         .transports
         .iter()
         .find(|endpoint| endpoint.name == scenario.transport)
-    else {
-        return WireConformanceCaseResult {
+        .ok_or_else(|| FixtureError::Validation {
+            message: format!(
+                "target manifest does not declare {:?} transport endpoint",
+                scenario.transport
+            ),
+        })?;
+    let case = wire_external_case_for_scenario(scenario)?;
+    let endpoint = wire_reference_endpoint(endpoint_manifest, target_manifest_path)?;
+    let timeout = wire_scenario_timeout(scenario);
+
+    let execution = tokio::time::timeout(timeout, run_wire_external_case(case, &endpoint)).await;
+    let evidence_paths = vec![wire_evidence_path(plan, &scenario.id)];
+    match execution {
+        Ok(Ok(report)) => Ok(wire_external_case_result(scenario, report, evidence_paths)),
+        Ok(Err(error)) => Ok(WireConformanceCaseResult {
+            id: scenario.id.clone(),
+            outcome: ApiProfileCaseOutcome::Failed,
+            terminal: WireConformanceTerminal::Error,
+            observed_frames: Vec::new(),
+            message: Some(format!("external wire target failed: {error}")),
+            evidence_paths,
+        }),
+        Err(_) => Ok(WireConformanceCaseResult {
             id: scenario.id.clone(),
             outcome: ApiProfileCaseOutcome::Failed,
             terminal: WireConformanceTerminal::Error,
             observed_frames: Vec::new(),
             message: Some(format!(
-                "target manifest does not declare {:?} transport endpoint",
-                scenario.transport
+                "external wire target exceeded {} ms execution timeout",
+                timeout.as_millis()
             )),
-            evidence_paths: vec![wire_evidence_path(plan, &scenario.id)],
-        };
-    };
-
-    let mut observed_frames = Vec::new();
-    for step in &scenario.steps {
-        let Some(frame) = &step.frame else {
-            continue;
-        };
-        let direction = match step.action.as_str() {
-            "receive" | "forward" => WireConformanceFrameDirection::Received,
-            "send" | "inject" | "send_frame" => WireConformanceFrameDirection::Sent,
-            _ => WireConformanceFrameDirection::Sent,
-        };
-        observed_frames.push(WireConformanceObservedFrame {
-            direction,
-            frame: frame.clone(),
-            payload: step.payload.clone(),
-            timestamp_us: Some(step.timeout_ms.unwrap_or_default()),
-        });
+            evidence_paths,
+        }),
     }
+}
 
-    for expected_frame in &scenario.expect.frames {
-        if !observed_frames
-            .iter()
-            .any(|observed| &observed.frame == expected_frame)
-        {
-            observed_frames.push(WireConformanceObservedFrame {
-                direction: WireConformanceFrameDirection::Received,
-                frame: expected_frame.clone(),
-                payload: Some(serde_json::json!({
-                    "reference_endpoint": endpoint.endpoint,
-                    "transport": endpoint.name,
-                    "mode": scenario.mode
-                })),
-                timestamp_us: Some(0),
+fn wire_external_case_for_scenario(
+    scenario: &WireConformanceScenario,
+) -> Result<WireExternalCase, FixtureError> {
+    let case = match scenario.id.as_str() {
+        "wire.control.cancel-abort.client" => WireExternalCase::CancelAbortClient,
+        "wire.control.priority-deadline.proxy" => WireExternalCase::PriorityDeadlineProxy,
+        "wire.control.progress-backpressure.server" => WireExternalCase::ProgressBackpressureServer,
+        "wire.control.capability-route-cache.client" => {
+            WireExternalCase::CapabilityRouteCacheClient
+        }
+        "wire.control.cancel-abort.ipc-client" => WireExternalCase::CancelAbortIpcClient,
+        "wire.control.progress-backpressure.websocket-server" => {
+            WireExternalCase::ProgressBackpressureWebSocketServer
+        }
+        _ => {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} has no typed external executor",
+                    scenario.id
+                ),
             });
         }
+    };
+    if wire_mode(case.mode()) != scenario.mode
+        || wire_transport(case.transport()) != scenario.transport
+    {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire scenario {} mode or transport does not match its typed executor",
+                scenario.id
+            ),
+        });
     }
-    observed_frames.push(WireConformanceObservedFrame {
-        direction: WireConformanceFrameDirection::Received,
-        frame: "SESSION_CLOSE".to_string(),
-        payload: Some(serde_json::json!({
-            "terminal": scenario.expect.terminal,
-            "reference_endpoint": endpoint.endpoint
-        })),
-        timestamp_us: Some(0),
-    });
+    Ok(case)
+}
 
+fn wire_reference_endpoint(
+    endpoint: &nnrp_conformance_fixtures::WireConformanceTransportEndpoint,
+    target_manifest_path: &Path,
+) -> Result<WireReferenceEndpoint, FixtureError> {
+    let transport = match endpoint.name {
+        nnrp_conformance_fixtures::WireConformanceTransport::Tcp => ReferenceTransport::Tcp,
+        nnrp_conformance_fixtures::WireConformanceTransport::Quic => ReferenceTransport::Quic,
+        nnrp_conformance_fixtures::WireConformanceTransport::Ipc => ReferenceTransport::Ipc,
+        nnrp_conformance_fixtures::WireConformanceTransport::Websocket => {
+            ReferenceTransport::WebSocket
+        }
+    };
+    let Some(security) = &endpoint.security else {
+        return Ok(WireReferenceEndpoint::plain(
+            transport,
+            endpoint.endpoint.clone(),
+        ));
+    };
+    let base = target_manifest_path.parent().unwrap_or(Path::new("."));
+    Ok(WireReferenceEndpoint::secure(
+        transport,
+        endpoint.endpoint.clone(),
+        WireEndpointSecurity {
+            server_name: security.server_name.clone(),
+            trusted_certificate_der: read_wire_security_file(
+                base,
+                &security.trusted_certificate_der_path,
+            )?,
+            certificate_der: read_wire_security_file(base, &security.certificate_der_path)?,
+            private_key_pkcs8_der: read_wire_security_file(
+                base,
+                &security.private_key_pkcs8_der_path,
+            )?,
+        },
+    ))
+}
+
+fn read_wire_security_file(base: &Path, relative_path: &str) -> Result<Vec<u8>, FixtureError> {
+    let path = base.join(relative_path);
+    std::fs::read(&path).map_err(|source| FixtureError::Read {
+        path: path.display().to_string(),
+        source,
+    })
+}
+
+fn wire_scenario_timeout(scenario: &WireConformanceScenario) -> Duration {
+    let declared_ms = scenario
+        .steps
+        .iter()
+        .filter_map(|step| step.timeout_ms)
+        .max()
+        .unwrap_or(0);
+    Duration::from_millis(declared_ms.saturating_add(5_000))
+}
+
+fn wire_external_case_result(
+    scenario: &WireConformanceScenario,
+    report: WireExternalCaseReport,
+    evidence_paths: Vec<String>,
+) -> WireConformanceCaseResult {
     WireConformanceCaseResult {
         id: scenario.id.clone(),
         outcome: ApiProfileCaseOutcome::Passed,
-        terminal: scenario.expect.terminal,
-        observed_frames,
+        terminal: wire_terminal(report.terminal),
+        observed_frames: report
+            .observed_frames
+            .into_iter()
+            .map(|frame| WireConformanceObservedFrame {
+                direction: wire_direction(frame.direction),
+                frame: wire_frame(frame.frame).to_string(),
+                payload: Some(frame.detail),
+                timestamp_us: Some(u64::try_from(frame.timestamp_us).unwrap_or(u64::MAX)),
+            })
+            .collect(),
         message: Some(format!(
-            "reference wire endpoint executed {:?} over {}",
-            scenario.mode, endpoint.endpoint
+            "external wire target executed {:?} over {:?} in {} us",
+            report.mode, report.transport, report.elapsed_us
         )),
-        evidence_paths: vec![wire_evidence_path(plan, &scenario.id)],
+        evidence_paths,
+    }
+}
+
+fn wire_mode(mode: WireExternalMode) -> nnrp_conformance_fixtures::WireConformanceMode {
+    match mode {
+        WireExternalMode::SuiteAsClient => {
+            nnrp_conformance_fixtures::WireConformanceMode::SuiteAsClient
+        }
+        WireExternalMode::SuiteAsServer => {
+            nnrp_conformance_fixtures::WireConformanceMode::SuiteAsServer
+        }
+        WireExternalMode::SuiteAsProxy => {
+            nnrp_conformance_fixtures::WireConformanceMode::SuiteAsProxy
+        }
+    }
+}
+
+fn wire_transport(
+    transport: ReferenceTransport,
+) -> nnrp_conformance_fixtures::WireConformanceTransport {
+    match transport {
+        ReferenceTransport::Tcp => nnrp_conformance_fixtures::WireConformanceTransport::Tcp,
+        ReferenceTransport::Ipc => nnrp_conformance_fixtures::WireConformanceTransport::Ipc,
+        ReferenceTransport::Quic => nnrp_conformance_fixtures::WireConformanceTransport::Quic,
+        ReferenceTransport::WebSocket => {
+            nnrp_conformance_fixtures::WireConformanceTransport::Websocket
+        }
+    }
+}
+
+fn wire_terminal(terminal: WireExternalTerminal) -> WireConformanceTerminal {
+    match terminal {
+        WireExternalTerminal::Success => WireConformanceTerminal::Success,
+        WireExternalTerminal::Cancelled => WireConformanceTerminal::Cancelled,
+        WireExternalTerminal::Dropped => WireConformanceTerminal::Dropped,
+    }
+}
+
+fn wire_direction(direction: WireExternalDirection) -> WireConformanceFrameDirection {
+    match direction {
+        WireExternalDirection::SuiteToTarget | WireExternalDirection::SuiteProxyToTarget => {
+            WireConformanceFrameDirection::Sent
+        }
+        WireExternalDirection::TargetToSuite
+        | WireExternalDirection::ProbeToSuiteProxy
+        | WireExternalDirection::TargetThroughSuiteProxyToProbe => {
+            WireConformanceFrameDirection::Received
+        }
+    }
+}
+
+fn wire_frame(frame: WireExternalFrame) -> &'static str {
+    match frame {
+        WireExternalFrame::Request => "REQUEST",
+        WireExternalFrame::Cancel => "CANCEL",
+        WireExternalFrame::PriorityUpdate => "PRIORITY_UPDATE",
+        WireExternalFrame::ExpireAt => "EXPIRE_AT",
+        WireExternalFrame::Progress => "PROGRESS",
+        WireExternalFrame::CreditUpdate => "CREDIT_UPDATE",
+        WireExternalFrame::PartialResult => "PARTIAL_RESULT",
+        WireExternalFrame::CapabilityNegotiation => "CAPABILITY_NEGOTIATION",
+        WireExternalFrame::RouteHint => "ROUTE_HINT",
+        WireExternalFrame::CacheReference => "CACHE_REFERENCE",
+        WireExternalFrame::CacheMiss => "CACHE_MISS",
+        WireExternalFrame::TraceContext => "TRACE_CONTEXT",
+        WireExternalFrame::ResultPush => "RESULT_PUSH",
+        WireExternalFrame::ResultDropReason => "RESULT_DROP_REASON",
     }
 }
 
@@ -1355,8 +1570,8 @@ mod tests {
         build_adapter_execution_plan, build_adapter_execution_plan_for_manifests,
         build_api_profile_execution_plan, build_benchmark_execution_plan, build_execution_plan,
         build_execution_plan_for_manifests, build_wire_conformance_execution_plan,
-        run_wire_conformance_reference, validate_api_profile_results,
-        validate_wire_conformance_results,
+        run_wire_conformance_external, validate_api_profile_results,
+        validate_wire_conformance_results, wire_external_case_for_scenario,
     };
     use nnrp_conformance_fixtures::{
         AdapterArtifactContext, ApiProfileCapabilityManifest, ApiProfileCaseOutcome,
@@ -1369,7 +1584,7 @@ mod tests {
         WireConformanceLimits, WireConformanceMode, WireConformanceObservedFrame,
         WireConformanceScenario, WireConformanceStep, WireConformanceTarget,
         WireConformanceTargetManifest, WireConformanceTerminal, WireConformanceTransport,
-        WireConformanceTransportEndpoint, load_json_file,
+        WireConformanceTransportEndpoint, WireConformanceTransportSecurity, load_json_file,
     };
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
@@ -2154,6 +2369,7 @@ mod tests {
                     name: WireConformanceTransport::Tcp,
                     endpoint: "127.0.0.1:44001".to_string(),
                     tls: false,
+                    security: None,
                 }],
                 capabilities: vec![
                     "control.cancel_abort".to_string(),
@@ -2242,6 +2458,46 @@ mod tests {
     }
 
     #[test]
+    fn wire_plan_rejects_transport_security_mismatches() {
+        let scenarios = [sample_wire_scenario(
+            "wire.control.priority-deadline.proxy",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Quic,
+            vec!["control.cancel_abort"],
+        )];
+        let artifacts = AdapterArtifactContext {
+            results_path: "artifacts/wire-results.json".to_string(),
+            evidence_dir: "artifacts/wire-evidence".to_string(),
+        };
+
+        let mut target = sample_wire_target();
+        target.wire_conformance.transports[0] = WireConformanceTransportEndpoint {
+            name: WireConformanceTransport::Quic,
+            endpoint: "127.0.0.1:44002".to_string(),
+            tls: false,
+            security: None,
+        };
+        let error = build_wire_conformance_execution_plan(&target, &scenarios, artifacts.clone())
+            .expect_err("QUIC without TLS material must be rejected");
+        assert!(error.to_string().contains("TLS flag and security material"));
+
+        target.wire_conformance.transports[0] = WireConformanceTransportEndpoint {
+            name: WireConformanceTransport::Websocket,
+            endpoint: "ws://127.0.0.1:44003/nnrp".to_string(),
+            tls: true,
+            security: Some(WireConformanceTransportSecurity {
+                server_name: "localhost".to_string(),
+                trusted_certificate_der_path: "certs/server.der".to_string(),
+                certificate_der_path: "certs/server.der".to_string(),
+                private_key_pkcs8_der_path: "certs/server-key.der".to_string(),
+            }),
+        };
+        let error = build_wire_conformance_execution_plan(&target, &scenarios, artifacts)
+            .expect_err("plain ws endpoint with TLS material must be rejected");
+        assert!(error.to_string().contains("TLS flag and security material"));
+    }
+
+    #[test]
     fn wire_results_validate_when_report_matches_selected_scenarios() {
         let plan = build_wire_conformance_execution_plan(
             &sample_wire_target(),
@@ -2326,37 +2582,33 @@ mod tests {
     }
 
     #[test]
-    fn wire_reference_runner_generates_valid_results_for_selected_scenarios() {
-        let plan = build_wire_conformance_execution_plan(
-            &sample_wire_target(),
-            &[sample_wire_scenario(
-                "selected",
-                WireConformanceMode::SuiteAsClient,
-                WireConformanceTransport::Tcp,
-                vec!["control.cancel_abort"],
-            )],
-            AdapterArtifactContext {
-                results_path: "artifacts/wire-results.json".to_string(),
-                evidence_dir: "artifacts/wire-evidence".to_string(),
-            },
-        )
-        .expect("wire execution plan should build");
-
-        let report = run_wire_conformance_reference(&plan, &sample_wire_target())
-            .expect("reference wire runner should produce results");
-        let summary = validate_wire_conformance_results(&plan, &report)
-            .expect("reference wire results should validate");
-
-        assert_eq!(summary.selected_scenarios, 1);
-        assert_eq!(summary.passed_scenarios, 1);
-        assert_eq!(
-            report.results[0].evidence_paths[0],
-            "artifacts/wire-evidence/selected.jsonl"
+    fn wire_external_runner_requires_a_typed_scenario_executor() {
+        let known = sample_wire_scenario(
+            "wire.control.cancel-abort.client",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
         );
+        assert_eq!(
+            wire_external_case_for_scenario(&known)
+                .expect("frozen scenario should have a typed executor")
+                .scenario_id(),
+            known.id
+        );
+
+        let unknown = sample_wire_scenario(
+            "wire.control.unknown.client",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        );
+        let error = wire_external_case_for_scenario(&unknown)
+            .expect_err("unknown scenario should not receive a synthetic executor");
+        assert!(error.to_string().contains("no typed external executor"));
     }
 
-    #[test]
-    fn wire_reference_runner_rejects_target_mismatch() {
+    #[tokio::test]
+    async fn wire_external_runner_rejects_target_mismatch() {
         let mut target = sample_wire_target();
         let plan = build_wire_conformance_execution_plan(
             &target,
@@ -2374,7 +2626,8 @@ mod tests {
         .expect("wire execution plan should build");
         target.target_name = "other-target".to_string();
 
-        let error = run_wire_conformance_reference(&plan, &target)
+        let error = run_wire_conformance_external(&plan, &target, Path::new("target.json"))
+            .await
             .expect_err("target mismatch should be rejected");
 
         assert!(error.to_string().contains("wire target name mismatch"));

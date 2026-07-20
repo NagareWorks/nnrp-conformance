@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use nnrp_conformance_fixtures::{
     AdapterArtifactContext, AdapterCaseOutcome, AdapterCaseResultReport, AdapterExecutionPlan,
@@ -11,10 +11,11 @@ use nnrp_conformance_fixtures::{
     load_json_file, verify_vector_manifest,
 };
 use nnrp_conformance_runner::{
-    build_adapter_execution_plan, build_adapter_execution_plan_for_manifests,
-    build_api_profile_execution_plan, build_benchmark_execution_plan, build_execution_plan,
-    build_execution_plan_for_manifests, build_wire_conformance_execution_plan,
-    run_wire_conformance_reference, summarize_wire_reference_report, validate_api_profile_results,
+    WireExternalExecutionSummary, build_adapter_execution_plan,
+    build_adapter_execution_plan_for_manifests, build_api_profile_execution_plan,
+    build_benchmark_execution_plan, build_execution_plan, build_execution_plan_for_manifests,
+    build_wire_conformance_execution_plan, run_wire_conformance_external,
+    summarize_wire_external_report, validate_api_profile_results,
     validate_wire_conformance_results,
 };
 use serde::Serialize;
@@ -151,7 +152,8 @@ enum Command {
     },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -424,7 +426,8 @@ fn main() -> Result<()> {
         } => {
             let wire_plan: WireConformanceExecutionPlan = load_json_file(&plan)?;
             let target_manifest: WireConformanceTargetManifest = load_json_file(&target)?;
-            let report = run_wire_conformance_reference(&wire_plan, &target_manifest)?;
+            let report =
+                run_wire_conformance_external(&wire_plan, &target_manifest, &target).await?;
             write_wire_evidence(&wire_plan, &report)?;
             let output_path =
                 output.unwrap_or_else(|| PathBuf::from(&wire_plan.artifacts.results_path));
@@ -432,11 +435,23 @@ fn main() -> Result<()> {
                 &output_path,
                 &format!("{}\n", serde_json::to_string_pretty(&report)?),
             )?;
-            let summary = summarize_wire_reference_report(&report);
+            let summary = summarize_wire_external_report(&report);
             println!("{}", serde_json::to_string_pretty(&summary)?);
+            ensure_wire_run_passed(&summary)?;
         }
     }
 
+    Ok(())
+}
+
+fn ensure_wire_run_passed(summary: &WireExternalExecutionSummary) -> Result<()> {
+    if summary.failed_scenarios != 0 {
+        bail!(
+            "wire conformance failed: {} of {} selected scenario(s) failed",
+            summary.failed_scenarios,
+            summary.selected_scenarios
+        );
+    }
     Ok(())
 }
 
@@ -739,13 +754,14 @@ fn validate_adapter_results(
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_adapter_results, validate_benchmark_results};
+    use super::{ensure_wire_run_passed, validate_adapter_results, validate_benchmark_results};
     use nnrp_conformance_fixtures::{
         AdapterArtifactContext, AdapterCaseOutcome, AdapterCaseResult, AdapterCaseResultReport,
         AdapterExecutionCase, AdapterExecutionPlan, BenchmarkArtifactContext, BenchmarkCategory,
         BenchmarkEnvironment, BenchmarkExecutionPlan, BenchmarkMetrics, BenchmarkOutcome,
         BenchmarkScenario, BenchmarkScenarioResult, BenchmarkWorkload, CaseLayer, CaseStatus,
     };
+    use nnrp_conformance_runner::WireExternalExecutionSummary;
 
     fn sample_plan() -> AdapterExecutionPlan {
         AdapterExecutionPlan {
@@ -809,6 +825,17 @@ mod tests {
         assert_eq!(summary.selected_cases, 2);
         assert_eq!(summary.error_cases, 1);
         assert_eq!(summary.skipped_cases, 1);
+    }
+
+    #[test]
+    fn wire_run_exit_gate_rejects_failed_scenarios() {
+        let error = ensure_wire_run_passed(&WireExternalExecutionSummary {
+            selected_scenarios: 6,
+            passed_scenarios: 5,
+            failed_scenarios: 1,
+        })
+        .expect_err("wire-run must fail its process when any selected scenario fails");
+        assert!(error.to_string().contains("1 of 6"));
     }
 
     #[test]
