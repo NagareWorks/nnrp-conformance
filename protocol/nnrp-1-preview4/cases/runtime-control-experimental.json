@@ -15,14 +15,14 @@
       "description": "Replace an obsolete operation while preserving trace continuity and marking late results droppable."
     },
     {
-      "id": "l1.control.retry-after",
+      "id": "l1.control.recoverable-error",
       "layer": "L1",
       "status": "experimental",
-      "feature": "control.retry_after",
+      "feature": "control.recoverable_error",
       "required_capabilities": [
-        "control.retry_after"
+        "control.recoverable_error"
       ],
-      "description": "Distinguish retryable pressure from terminal failure and provide retry-after timing."
+      "description": "Distinguish recoverable errors from terminal failures and provide retry-after timing when required."
     }
   ]
 }
