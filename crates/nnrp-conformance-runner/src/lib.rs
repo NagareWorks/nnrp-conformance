@@ -351,14 +351,15 @@ fn validate_wire_transport_endpoint(
             message: format!("{:?} wire endpoint must not be empty", endpoint.name),
         });
     }
-    let requires_security = match endpoint.name {
-        WireConformanceTransport::Tcp | WireConformanceTransport::Ipc => false,
-        WireConformanceTransport::Quic => true,
+    let (allows_security, requires_security) = match endpoint.name {
+        WireConformanceTransport::Tcp => (true, false),
+        WireConformanceTransport::Ipc => (false, false),
+        WireConformanceTransport::Quic => (true, true),
         WireConformanceTransport::Websocket => {
             if endpoint.endpoint.starts_with("wss://") {
-                true
+                (true, true)
             } else if endpoint.endpoint.starts_with("ws://") {
-                false
+                (false, false)
             } else {
                 return Err(FixtureError::Validation {
                     message: "WebSocket wire endpoint must use ws:// or wss://".to_string(),
@@ -366,7 +367,10 @@ fn validate_wire_transport_endpoint(
             }
         }
     };
-    if endpoint.tls != requires_security || endpoint.security.is_some() != requires_security {
+    if endpoint.tls != endpoint.security.is_some()
+        || (requires_security && !endpoint.tls)
+        || (!allows_security && endpoint.tls)
+    {
         return Err(FixtureError::Validation {
             message: format!(
                 "{:?} wire endpoint TLS flag and security material do not match its transport contract",
@@ -2495,6 +2499,35 @@ mod tests {
         let error = build_wire_conformance_execution_plan(&target, &scenarios, artifacts)
             .expect_err("plain ws endpoint with TLS material must be rejected");
         assert!(error.to_string().contains("TLS flag and security material"));
+    }
+
+    #[test]
+    fn wire_plan_accepts_plain_and_tls_tcp_endpoints() {
+        let scenarios = [sample_wire_scenario(
+            "wire.control.cancel-abort.client",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        )];
+        let artifacts = AdapterArtifactContext {
+            results_path: "artifacts/wire-results.json".to_string(),
+            evidence_dir: "artifacts/wire-evidence".to_string(),
+        };
+
+        build_wire_conformance_execution_plan(&sample_wire_target(), &scenarios, artifacts.clone())
+            .expect("plain TCP endpoint should remain valid");
+
+        let mut secure_target = sample_wire_target();
+        secure_target.wire_conformance.transports[0].tls = true;
+        secure_target.wire_conformance.transports[0].security =
+            Some(WireConformanceTransportSecurity {
+                server_name: "localhost".to_string(),
+                trusted_certificate_der_path: "certs/server.der".to_string(),
+                certificate_der_path: "certs/server.der".to_string(),
+                private_key_pkcs8_der_path: "certs/server-key.der".to_string(),
+            });
+        build_wire_conformance_execution_plan(&secure_target, &scenarios, artifacts)
+            .expect("TCP TLS endpoint should be valid with route-local security material");
     }
 
     #[test]

@@ -595,9 +595,8 @@ dependencies = [
 
 [[package]]
 name = "nnrp-conformance"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e50c9580a1843a643a12222d3bf35ab74c5cd876511f9359520e8d4db8565ac5"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
  "http",
  "nnrp-core",
@@ -639,18 +638,16 @@ dependencies = [
 
 [[package]]
 name = "nnrp-core"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6adbe54af9318418b5f63a9b215856a281f545bd78d6fbc234cb32f6a208c85e"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "nnrp-ffi"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "792a00570dcb099ebcd7b14ddca874105a3b6a4ebfd58686cb754fb0170a9d66"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
  "async-trait",
  "http",
@@ -663,21 +660,22 @@ dependencies = [
 
 [[package]]
 name = "nnrp-runtime"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a911082d0ff278318560510d950a0d05257ab78762ccf9e6dbff75981a9b498"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
  "async-trait",
+ "futures-util",
+ "http",
  "nnrp-core",
+ "nnrp-transport-provider",
  "thiserror",
  "tokio",
 ]
 
 [[package]]
 name = "nnrp-transport-ipc"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "781b139b92a4b9d6eabbd1487dffc0b2c0ff0a9a66959d4b520db91983f4b004"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -688,9 +686,8 @@ dependencies = [
 
 [[package]]
 name = "nnrp-transport-provider"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "009d23a1df0f2ffcc3e8cd21df057f37b1277cf9c502456553fbd0d5d171948c"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
  "nnrp-core",
  "thiserror",
@@ -698,9 +695,8 @@ dependencies = [
 
 [[package]]
 name = "nnrp-transport-quic"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae7468c32cd687528211b916c7e8289a299ee988f5ea0a1882bc54b61f4e59a9"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -715,21 +711,22 @@ dependencies = [
 
 [[package]]
 name = "nnrp-transport-tcp"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31f8d01c4f41a2dd1b99c4e8676f3e9a6eee699c85a26b6e4ca5b46694269f37"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
+ "async-trait",
  "nnrp-core",
  "nnrp-runtime",
  "nnrp-transport-provider",
+ "rustls",
  "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]
 name = "nnrp-transport-websocket"
-version = "1.0.0-preview.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0117d2ef6442904fc89f0190460c5cc56d4e7ae13777065d9d798df7cac85e69"
+version = "1.0.0-preview.4.16"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=a00b77af4e13fc5a21473f6c90a288bd3d248fc7#a00b77af4e13fc5a21473f6c90a288bd3d248fc7"
 dependencies = [
  "async-trait",
  "futures-util",

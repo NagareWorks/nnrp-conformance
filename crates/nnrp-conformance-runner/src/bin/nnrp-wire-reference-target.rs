@@ -59,9 +59,10 @@ async fn run_reference_target(manifest_path: &Path) -> Result<()> {
         &security.private_key_pkcs8_der,
     )?;
 
-    let tcp_server = WireReferenceEndpoint::plain(ReferenceTransport::Tcp, "127.0.0.1:0")
-        .bind()
-        .await?;
+    let tcp_server =
+        WireReferenceEndpoint::secure(ReferenceTransport::Tcp, "127.0.0.1:0", security.clone())
+            .bind()
+            .await?;
     let tcp_addr = tcp_server.local_addr()?;
 
     let quic_server =
@@ -88,9 +89,10 @@ async fn run_reference_target(manifest_path: &Path) -> Result<()> {
     cancel_target(&tcp_server).await?;
     drop(tcp_server);
     priority_target(&quic_server).await?;
-    progress_target_with_retry(WireReferenceEndpoint::plain(
+    progress_target_with_retry(WireReferenceEndpoint::secure(
         ReferenceTransport::Tcp,
         tcp_addr.to_string(),
+        security.clone(),
     ))
     .await?;
     cache_target(&quic_server).await?;
@@ -139,8 +141,8 @@ fn write_target_manifest(
                 WireConformanceTransportEndpoint {
                     name: WireConformanceTransport::Tcp,
                     endpoint: tcp_addr.to_string(),
-                    tls: false,
-                    security: None,
+                    tls: true,
+                    security: Some(tls.clone()),
                 },
                 WireConformanceTransportEndpoint {
                     name: WireConformanceTransport::Quic,
