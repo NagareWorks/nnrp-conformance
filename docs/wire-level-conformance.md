@@ -170,6 +170,13 @@ one-provider-per-transport registry contract. Neither profile claims the browser
 identity, so neither can impersonate or accidentally satisfy the browser WSS case; that case is
 selected only by a browser-capable target.
 
+Two negative reference targets expose only the client or server host role. CI executes the complete
+native host-route-only plan against each target, requires supported-role scenarios to pass, and
+requires every opposite-role scenario to return a failed case result. The runner and result
+validator then verify different properties: `wire-run` must return a failing process status, while
+result validation must accept the complete and truthful mixed report. This prevents a singular-role
+implementation from being accepted as complete host-route coverage without discarding its evidence.
+
 The same path is available locally:
 
 ```powershell
@@ -221,8 +228,10 @@ The current runner has typed executors for all six frame-level preview4 scenario
 host-route scenarios. Repository CI selects the six frame scenarios and nine native host-route
 scenarios across installed-provider and uninstalled-QUIC target profiles, drives independent target
 processes over TCP, QUIC, IPC, and secure WebSocket endpoints, and validates both generated result
-reports with zero skipped cases. The browser WSS scenario remains part of the mandatory suite and is
-selected when a target declares the browser provider identity.
+reports with zero skipped cases. It also runs the eight installed native host-route scenarios
+against client-only and server-only targets and requires the unsupported half to fail. The browser
+WSS scenario remains part of the mandatory suite and is selected when a target declares the browser
+provider identity.
 
 Third-party live endpoints use the same target manifest and execution-plan contract. Adapter
 execution remains separate and should not be used to prove wire-level semantics.

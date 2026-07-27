@@ -2,6 +2,10 @@ param(
   [string]$ArtifactDirectory = "artifacts/wire-e2e"
 )
 
+if ($PSVersionTable.PSEdition -ne "Core" -or $PSVersionTable.PSVersion.Major -lt 7) {
+  throw "Wire E2E validation requires PowerShell Core 7 or newer. Run this script with pwsh."
+}
+
 $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $artifactRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $ArtifactDirectory))
@@ -10,6 +14,8 @@ $executableSuffix = if ($IsWindows) { ".exe" } else { "" }
 $runnerExecutable = Join-Path $targetDirectory "nnrp-conformance-runner$executableSuffix"
 $targetExecutable = Join-Path $targetDirectory "nnrp-wire-reference-target$executableSuffix"
 $hostRouteTargetExecutable = Join-Path $targetDirectory "nnrp-wire-host-route-reference-target$executableSuffix"
+$clientOnlyHostRouteTargetExecutable = Join-Path $targetDirectory "nnrp-wire-host-route-client-only-reference-target$executableSuffix"
+$serverOnlyHostRouteTargetExecutable = Join-Path $targetDirectory "nnrp-wire-host-route-server-only-reference-target$executableSuffix"
 
 New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
 
@@ -19,10 +25,18 @@ $resultReport = Join-Path $artifactRoot "results.json"
 $uninstalledTargetManifest = Join-Path $artifactRoot "target-uninstalled-quic.json"
 $uninstalledExecutionPlan = Join-Path $artifactRoot "plan-uninstalled-quic.json"
 $uninstalledResultReport = Join-Path $artifactRoot "results-uninstalled-quic.json"
+$hostRouteOnlyTargetManifest = Join-Path $artifactRoot "target-host-route-only.json"
+$hostRouteOnlyExecutionPlan = Join-Path $artifactRoot "plan-host-route-only.json"
+$clientOnlyResultReport = Join-Path $artifactRoot "results-client-only.json"
+$serverOnlyResultReport = Join-Path $artifactRoot "results-server-only.json"
+$clientOnlyErrorLog = Join-Path $artifactRoot "client-only.expected-error.log"
+$serverOnlyErrorLog = Join-Path $artifactRoot "server-only.expected-error.log"
 $targetStdout = Join-Path $artifactRoot "target.stdout.log"
 $targetStderr = Join-Path $artifactRoot "target.stderr.log"
 $evidenceDirectory = Join-Path $artifactRoot "evidence"
 $uninstalledEvidenceDirectory = Join-Path $artifactRoot "evidence-uninstalled-quic"
+$clientOnlyEvidenceDirectory = Join-Path $artifactRoot "evidence-client-only"
+$serverOnlyEvidenceDirectory = Join-Path $artifactRoot "evidence-server-only"
 
 foreach ($path in @(
   $targetManifest,
@@ -31,6 +45,12 @@ foreach ($path in @(
   $uninstalledTargetManifest,
   $uninstalledExecutionPlan,
   $uninstalledResultReport,
+  $hostRouteOnlyTargetManifest,
+  $hostRouteOnlyExecutionPlan,
+  $clientOnlyResultReport,
+  $serverOnlyResultReport,
+  $clientOnlyErrorLog,
+  $serverOnlyErrorLog,
   $targetStdout,
   $targetStderr
 )) {
@@ -39,9 +59,55 @@ foreach ($path in @(
   }
 }
 
-foreach ($path in @($evidenceDirectory, $uninstalledEvidenceDirectory)) {
+foreach ($path in @(
+  $evidenceDirectory,
+  $uninstalledEvidenceDirectory,
+  $clientOnlyEvidenceDirectory,
+  $serverOnlyEvidenceDirectory
+)) {
   if (Test-Path -LiteralPath $path) {
     Remove-Item -LiteralPath $path -Recurse -Force
+  }
+}
+
+function Assert-SingularRoleResult {
+  param(
+    [Parameter(Mandatory = $true)] [string]$PlanPath,
+    [Parameter(Mandatory = $true)] [string]$ResultPath,
+    [Parameter(Mandatory = $true)] [ValidateSet("client", "server")] [string]$SupportedRole
+  )
+
+  $plan = Get-Content -LiteralPath $PlanPath -Raw | ConvertFrom-Json
+  $report = Get-Content -LiteralPath $ResultPath -Raw | ConvertFrom-Json
+  if ($plan.scenarios.Count -ne 8) {
+    throw "$SupportedRole-only target expected the eight installed native host-route scenarios, got $($plan.scenarios.Count)."
+  }
+  if ($plan.scenarios.Count -ne $report.results.Count) {
+    throw "$SupportedRole-only target returned $($report.results.Count) results for $($plan.scenarios.Count) scenarios."
+  }
+
+  $passed = 0
+  $failed = 0
+  foreach ($scenario in $plan.scenarios) {
+    $result = @($report.results | Where-Object id -eq $scenario.id)
+    if ($result.Count -ne 1) {
+      throw "$SupportedRole-only target did not return exactly one result for $($scenario.id)."
+    }
+    if ($scenario.host_route.role -eq $SupportedRole) {
+      if ($result[0].outcome -ne "passed") {
+        throw "$SupportedRole-only target failed its supported $($scenario.host_route.role) scenario $($scenario.id)."
+      }
+      $passed += 1
+    }
+    else {
+      if ($result[0].outcome -ne "failed" -or $result[0].message -notmatch "implements only the $SupportedRole host role") {
+        throw "$SupportedRole-only target did not explicitly reject $($scenario.host_route.role) scenario $($scenario.id)."
+      }
+      $failed += 1
+    }
+  }
+  if ($passed -ne 4 -or $failed -ne 4) {
+    throw "$SupportedRole-only target expected four supported and four rejected scenarios, got $passed and $failed."
   }
 }
 
@@ -155,6 +221,66 @@ if ($LASTEXITCODE -ne 0) {
   --results $uninstalledResultReport
 if ($LASTEXITCODE -ne 0) {
   throw "uninstalled-QUIC validate-wire-results failed with exit code $LASTEXITCODE."
+}
+
+& $targetExecutable `
+  --manifest $hostRouteOnlyTargetManifest `
+  --profile host-route-only
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to publish the host-route-only target manifest."
+}
+
+& $runnerExecutable wire-plan `
+  --suite (Join-Path $repositoryRoot "wire-conformance/nnrp-1-preview4/manifest.json") `
+  --target $hostRouteOnlyTargetManifest `
+  --output $hostRouteOnlyExecutionPlan `
+  --results-path $clientOnlyResultReport `
+  --evidence-dir $clientOnlyEvidenceDirectory
+if ($LASTEXITCODE -ne 0) {
+  throw "host-route-only wire-plan failed with exit code $LASTEXITCODE."
+}
+
+foreach ($singularTarget in @(
+  @{
+    Role = "client"
+    Executable = $clientOnlyHostRouteTargetExecutable
+    Results = $clientOnlyResultReport
+    Evidence = $clientOnlyEvidenceDirectory
+    ErrorLog = $clientOnlyErrorLog
+  },
+  @{
+    Role = "server"
+    Executable = $serverOnlyHostRouteTargetExecutable
+    Results = $serverOnlyResultReport
+    Evidence = $serverOnlyEvidenceDirectory
+    ErrorLog = $serverOnlyErrorLog
+  }
+)) {
+  $plan = Get-Content -LiteralPath $hostRouteOnlyExecutionPlan -Raw | ConvertFrom-Json
+  $plan.artifacts.results_path = $singularTarget.Results
+  $plan.artifacts.evidence_dir = $singularTarget.Evidence
+  $plan | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $hostRouteOnlyExecutionPlan
+
+  & $runnerExecutable wire-run `
+    --plan $hostRouteOnlyExecutionPlan `
+    --target $hostRouteOnlyTargetManifest `
+    --host-route-target $singularTarget.Executable `
+    --output $singularTarget.Results `
+    2> $singularTarget.ErrorLog
+  if ($LASTEXITCODE -eq 0) {
+    throw "$($singularTarget.Role)-only host-route target unexpectedly passed every scenario."
+  }
+  Assert-SingularRoleResult `
+    -PlanPath $hostRouteOnlyExecutionPlan `
+    -ResultPath $singularTarget.Results `
+    -SupportedRole $singularTarget.Role
+
+  & $runnerExecutable validate-wire-results `
+    --plan $hostRouteOnlyExecutionPlan `
+    --results $singularTarget.Results
+  if ($LASTEXITCODE -ne 0) {
+    throw "$($singularTarget.Role)-only target did not produce a complete, valid failure report."
+  }
 }
 
 Get-Content -LiteralPath $resultReport

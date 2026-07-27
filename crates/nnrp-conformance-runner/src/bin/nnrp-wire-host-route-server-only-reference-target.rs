@@ -4,9 +4,9 @@ mod host_route_reference_target;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     host_route_reference_target::run(host_route_reference_target::SupportedHostRoles {
-        client: true,
+        client: false,
         server: true,
-        label: "client and server",
+        label: "server",
     })
     .await
 }
