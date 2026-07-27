@@ -13,13 +13,13 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/client-primary",
             "security": {"mode": "plain", "credential_owner": "none"}
           },
           {
             "transport": "ipc",
-            "provider_id": "official.ipc",
+            "provider_id": "nnrp.transport.ipc.native",
             "locator": "suite://allocate/ipc/client-secondary",
             "security": {"mode": "plain", "credential_owner": "none"}
           }
@@ -45,7 +45,7 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/unresolved",
             "security": {"mode": "plain", "credential_owner": "none"},
             "injected_failures": ["route_unresolved"]
@@ -72,7 +72,7 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/insecure",
             "security": {"mode": "plain", "credential_owner": "none"},
             "injected_failures": ["security_incompatible"]
@@ -99,13 +99,13 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/server-primary",
             "security": {"mode": "plain", "credential_owner": "none"}
           },
           {
             "transport": "ipc",
-            "provider_id": "official.ipc",
+            "provider_id": "nnrp.transport.ipc.native",
             "locator": "suite://allocate/ipc/server-secondary",
             "security": {"mode": "plain", "credential_owner": "none"}
           }
@@ -136,13 +136,13 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/rollback-opened",
             "security": {"mode": "plain", "credential_owner": "none"}
           },
           {
             "transport": "ipc",
-            "provider_id": "official.ipc",
+            "provider_id": "nnrp.transport.ipc.native",
             "locator": "suite://allocate/ipc/rollback-failed",
             "security": {"mode": "plain", "credential_owner": "none"},
             "injected_failures": ["bind_failure"]
@@ -166,13 +166,13 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/terminal-primary",
             "security": {"mode": "plain", "credential_owner": "none"}
           },
           {
             "transport": "ipc",
-            "provider_id": "official.ipc",
+            "provider_id": "nnrp.transport.ipc.native",
             "locator": "suite://allocate/ipc/terminal-failed",
             "security": {"mode": "plain", "credential_owner": "none"},
             "injected_failures": ["terminal_listener_failure"]
@@ -186,7 +186,7 @@
       "steps": [{"action": "fail_listener", "timeout_ms": 2000}],
       "expect": {
         "terminal": "error",
-        "route": {"logical_set_closed": true, "terminal_failure": "official.ipc"}
+        "route": {"logical_set_closed": true, "terminal_failure": "nnrp.transport.ipc.native"}
       }
     },
     {
@@ -199,13 +199,13 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/tls",
             "security": {"mode": "tls_server_auth", "credential_owner": "target"}
           },
           {
             "transport": "quic",
-            "provider_id": "official.quic",
+            "provider_id": "nnrp.transport.quic.native",
             "locator": "suite://allocate/quic/tls",
             "security": {"mode": "tls_server_auth", "credential_owner": "target"}
           }
@@ -231,7 +231,7 @@
         "routes": [
           {
             "transport": "websocket",
-            "provider_id": "browser.websocket",
+            "provider_id": "nnrp.transport.websocket.browser-wasm",
             "locator": "suite://allocate/websocket/wss",
             "security": {"mode": "browser_host", "credential_owner": "host"}
           }
@@ -257,7 +257,7 @@
         "routes": [
           {
             "transport": "quic",
-            "provider_id": "official.quic.uninstalled",
+            "provider_id": "example.transport.quic.uninstalled",
             "locator": "suite://allocate/quic/uninstalled",
             "security": {"mode": "tls_server_auth", "credential_owner": "suite"}
           }
@@ -283,7 +283,7 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/combined-failure",
             "security": {"mode": "plain", "credential_owner": "none"},
             "injected_failures": ["route_unresolved", "security_incompatible"]

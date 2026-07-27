@@ -3033,14 +3033,14 @@ mod tests {
         target.wire_conformance.host_route_providers = vec![
             WireHostRouteProviderCapability {
                 transport: WireConformanceTransport::Tcp,
-                provider_id: "official.tcp".to_string(),
+                provider_id: "nnrp.transport.tcp.native".to_string(),
                 installed: true,
                 platforms: vec![WireHostPlatform::Native],
                 security_modes: vec![WireHostRouteSecurityMode::Plain],
             },
             WireHostRouteProviderCapability {
                 transport: WireConformanceTransport::Ipc,
-                provider_id: "official.ipc".to_string(),
+                provider_id: "nnrp.transport.ipc.native".to_string(),
                 installed: true,
                 platforms: vec![WireHostPlatform::Native],
                 security_modes: vec![WireHostRouteSecurityMode::Plain],
@@ -3061,7 +3061,7 @@ mod tests {
                 routes: vec![
                     WireHostProviderRoute {
                         transport: WireConformanceTransport::Tcp,
-                        provider_id: "official.tcp".to_string(),
+                        provider_id: "nnrp.transport.tcp.native".to_string(),
                         locator: "suite://allocate/tcp/client-primary".to_string(),
                         security: WireHostRouteSecurity {
                             mode: WireHostRouteSecurityMode::Plain,
@@ -3071,7 +3071,7 @@ mod tests {
                     },
                     WireHostProviderRoute {
                         transport: WireConformanceTransport::Ipc,
-                        provider_id: "official.ipc".to_string(),
+                        provider_id: "nnrp.transport.ipc.native".to_string(),
                         locator: "suite://allocate/ipc/client-secondary".to_string(),
                         security: WireHostRouteSecurity {
                             mode: WireHostRouteSecurityMode::Plain,
@@ -3112,8 +3112,8 @@ mod tests {
         WireHostRouteEvidence {
             application_endpoint: "nnrp://host-route.test".to_string(),
             candidates: [
-                (WireConformanceTransport::Tcp, "official.tcp"),
-                (WireConformanceTransport::Ipc, "official.ipc"),
+                (WireConformanceTransport::Tcp, "nnrp.transport.tcp.native"),
+                (WireConformanceTransport::Ipc, "nnrp.transport.ipc.native"),
             ]
             .into_iter()
             .enumerate()
@@ -3140,7 +3140,7 @@ mod tests {
             listeners: vec![],
             accepted_sessions: vec![WireHostAcceptedSessionEvidence {
                 transport: WireConformanceTransport::Tcp,
-                provider_id: "official.tcp".to_string(),
+                provider_id: "nnrp.transport.tcp.native".to_string(),
                 active_transport: WireConformanceTransport::Tcp,
             }],
             atomic_rollback: false,
@@ -3213,7 +3213,7 @@ mod tests {
         evidence.candidates[1].selected = true;
         evidence.accepted_sessions[0] = WireHostAcceptedSessionEvidence {
             transport: WireConformanceTransport::Ipc,
-            provider_id: "official.ipc".to_string(),
+            provider_id: "nnrp.transport.ipc.native".to_string(),
             active_transport: WireConformanceTransport::Ipc,
         };
         let report = WireConformanceCaseResultReport {
@@ -3535,7 +3535,7 @@ mod tests {
         let mut evidence = sample_host_route_evidence(1);
         evidence.accepted_sessions[0] = WireHostAcceptedSessionEvidence {
             transport: WireConformanceTransport::Ipc,
-            provider_id: "official.ipc".to_string(),
+            provider_id: "nnrp.transport.ipc.native".to_string(),
             active_transport: WireConformanceTransport::Ipc,
         };
         let report = WireConformanceCaseResultReport {
