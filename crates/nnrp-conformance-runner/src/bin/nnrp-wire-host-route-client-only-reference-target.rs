@@ -5,8 +5,8 @@ mod host_route_reference_target;
 async fn main() -> anyhow::Result<()> {
     host_route_reference_target::run(host_route_reference_target::SupportedHostRoles {
         client: true,
-        server: true,
-        label: "client and server",
+        server: false,
+        label: "client",
     })
     .await
 }

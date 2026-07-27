@@ -37,7 +37,7 @@ NNRP frames directly.
   - [x] Record every candidate rejection reason and selected transport.
   - [x] Record every opened, rolled-back, accepted, and closed server listener.
   - [x] Record every actual bound provider endpoint and terminal listener-set failure.
-- [ ] Add CI reference targets proving the host-route scenarios fail for singular-role implementations.
+- [x] Add CI reference targets proving the host-route scenarios fail for singular-role implementations.
 
 ## Exit criteria
 

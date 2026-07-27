@@ -39,6 +39,7 @@ struct Args {
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum TargetProfile {
     Native,
+    HostRouteOnly,
     UninstalledQuic,
 }
 
@@ -49,8 +50,10 @@ async fn main() -> Result<()> {
 }
 
 async fn run_reference_target(manifest_path: &Path, profile: TargetProfile) -> Result<()> {
-    if matches!(profile, TargetProfile::UninstalledQuic) {
-        return write_uninstalled_quic_manifest(manifest_path);
+    match profile {
+        TargetProfile::HostRouteOnly => return write_host_route_only_manifest(manifest_path),
+        TargetProfile::UninstalledQuic => return write_uninstalled_quic_manifest(manifest_path),
+        TargetProfile::Native => {}
     }
     let manifest_dir = manifest_path.parent().unwrap_or(Path::new("."));
     let cert_dir = manifest_dir.join("certs");
@@ -178,46 +181,7 @@ fn write_target_manifest(
                     security: Some(tls),
                 },
             ],
-            host_route_providers: vec![
-                WireHostRouteProviderCapability {
-                    transport: WireConformanceTransport::Tcp,
-                    provider_id: "nnrp.transport.tcp.native".to_string(),
-                    installed: true,
-                    platforms: vec![WireHostPlatform::Native],
-                    security_modes: vec![
-                        WireHostRouteSecurityMode::Plain,
-                        WireHostRouteSecurityMode::TlsServerAuth,
-                        WireHostRouteSecurityMode::MutualTls,
-                    ],
-                },
-                WireHostRouteProviderCapability {
-                    transport: WireConformanceTransport::Quic,
-                    provider_id: "nnrp.transport.quic.native".to_string(),
-                    installed: true,
-                    platforms: vec![WireHostPlatform::Native],
-                    security_modes: vec![
-                        WireHostRouteSecurityMode::TlsServerAuth,
-                        WireHostRouteSecurityMode::MutualTls,
-                    ],
-                },
-                WireHostRouteProviderCapability {
-                    transport: WireConformanceTransport::Ipc,
-                    provider_id: "nnrp.transport.ipc.native".to_string(),
-                    installed: true,
-                    platforms: vec![WireHostPlatform::Native],
-                    security_modes: vec![WireHostRouteSecurityMode::Plain],
-                },
-                WireHostRouteProviderCapability {
-                    transport: WireConformanceTransport::Websocket,
-                    provider_id: "nnrp.transport.websocket.native".to_string(),
-                    installed: true,
-                    platforms: vec![WireHostPlatform::Native],
-                    security_modes: vec![
-                        WireHostRouteSecurityMode::Plain,
-                        WireHostRouteSecurityMode::Wss,
-                    ],
-                },
-            ],
+            host_route_providers: native_host_route_providers(),
             capabilities: vec![
                 "control.cancel_abort".to_string(),
                 "control.priority_update".to_string(),
@@ -241,6 +205,75 @@ fn write_target_manifest(
         },
     };
     write_manifest_atomically(manifest_path, &manifest)
+}
+
+fn write_host_route_only_manifest(manifest_path: &Path) -> Result<()> {
+    let manifest = WireConformanceTargetManifest {
+        schema: Some(
+            "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-target.schema.json"
+                .to_string(),
+        ),
+        target_name: "reference-preview4-host-route-only-target".to_string(),
+        protocol_version: "nnrp-1-preview4".to_string(),
+        suite_version: env!("CARGO_PKG_VERSION").to_string(),
+        wire_conformance: WireConformanceTarget {
+            modes: vec![
+                WireConformanceMode::SuiteAsClient,
+                WireConformanceMode::SuiteAsServer,
+            ],
+            transports: Vec::new(),
+            host_route_providers: native_host_route_providers(),
+            capabilities: vec!["host.routes".to_string()],
+            limits: WireConformanceLimits {
+                max_frame_bytes: 16_777_216,
+                max_in_flight: 256,
+            },
+        },
+    };
+    write_manifest_atomically(manifest_path, &manifest)
+}
+
+fn native_host_route_providers() -> Vec<WireHostRouteProviderCapability> {
+    vec![
+        WireHostRouteProviderCapability {
+            transport: WireConformanceTransport::Tcp,
+            provider_id: "nnrp.transport.tcp.native".to_string(),
+            installed: true,
+            platforms: vec![WireHostPlatform::Native],
+            security_modes: vec![
+                WireHostRouteSecurityMode::Plain,
+                WireHostRouteSecurityMode::TlsServerAuth,
+                WireHostRouteSecurityMode::MutualTls,
+            ],
+        },
+        WireHostRouteProviderCapability {
+            transport: WireConformanceTransport::Quic,
+            provider_id: "nnrp.transport.quic.native".to_string(),
+            installed: true,
+            platforms: vec![WireHostPlatform::Native],
+            security_modes: vec![
+                WireHostRouteSecurityMode::TlsServerAuth,
+                WireHostRouteSecurityMode::MutualTls,
+            ],
+        },
+        WireHostRouteProviderCapability {
+            transport: WireConformanceTransport::Ipc,
+            provider_id: "nnrp.transport.ipc.native".to_string(),
+            installed: true,
+            platforms: vec![WireHostPlatform::Native],
+            security_modes: vec![WireHostRouteSecurityMode::Plain],
+        },
+        WireHostRouteProviderCapability {
+            transport: WireConformanceTransport::Websocket,
+            provider_id: "nnrp.transport.websocket.native".to_string(),
+            installed: true,
+            platforms: vec![WireHostPlatform::Native],
+            security_modes: vec![
+                WireHostRouteSecurityMode::Plain,
+                WireHostRouteSecurityMode::Wss,
+            ],
+        },
+    ]
 }
 
 fn write_uninstalled_quic_manifest(manifest_path: &Path) -> Result<()> {
