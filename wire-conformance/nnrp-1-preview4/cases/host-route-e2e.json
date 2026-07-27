@@ -222,6 +222,32 @@
       }
     },
     {
+      "id": "wire.host-route.native.websocket-client",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "native",
+        "application_endpoint": "nnrp://host-route.test",
+        "routes": [
+          {
+            "transport": "websocket",
+            "provider_id": "nnrp.transport.websocket.native",
+            "locator": "suite://allocate/websocket/native-client",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "A native client selects the installed WebSocket provider through its route-local locator without changing the NNRP application endpoint.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 2000}],
+      "expect": {
+        "terminal": "success",
+        "route": {"selected_count": 1, "selected_transport": "websocket"}
+      }
+    },
+    {
       "id": "wire.host-route.browser.wss",
       "mode": "suite_as_server",
       "host_route": {
