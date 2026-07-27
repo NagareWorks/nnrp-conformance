@@ -20,6 +20,144 @@
         "cache_key_hi": {"$ref": "#/$defs/unsignedDecimalU64"},
         "cache_key_lo": {"$ref": "#/$defs/unsignedDecimalU64"}
       }
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["tcp", "quic", "websocket", "ipc"]
+    },
+    "rejectionReason": {
+      "type": "string",
+      "enum": [
+        "policy-disallowed",
+        "local-unavailable",
+        "peer-unsupported",
+        "limit-exceeded",
+        "route-unresolved",
+        "security-unsatisfied",
+        "probe-missing",
+        "probe-failed"
+      ]
+    },
+    "hostRouteSecurity": {
+      "type": "object",
+      "required": ["mode", "credential_owner"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plain", "tls_server_auth", "mutual_tls", "wss", "browser_host"]
+        },
+        "credential_owner": {
+          "type": "string",
+          "enum": ["none", "suite", "target", "host"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "hostRoute": {
+      "type": "object",
+      "required": ["role", "platform", "application_endpoint", "routes"],
+      "properties": {
+        "role": {"type": "string", "enum": ["client", "server"]},
+        "platform": {"type": "string", "enum": ["native", "browser"]},
+        "application_endpoint": {"type": "string", "pattern": "^nnrps?://"},
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["transport", "provider_id", "locator", "security"],
+            "properties": {
+              "transport": {"$ref": "#/$defs/transport"},
+              "provider_id": {"type": "string", "minLength": 1},
+              "locator": {"type": "string", "minLength": 1},
+              "security": {"$ref": "#/$defs/hostRouteSecurity"},
+              "injected_failures": {
+                "type": "array",
+                "description": "Suite fault controls, not rejection tokens. route_unresolved maps to route-unresolved; security_incompatible maps to security-unsatisfied; bind and terminal-listener failures are listener-state oracles.",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "route_unresolved",
+                    "security_incompatible",
+                    "bind_failure",
+                    "terminal_listener_failure"
+                  ]
+                },
+                "uniqueItems": true
+              }
+            },
+            "allOf": [
+              {
+                "if": {"properties": {"transport": {"const": "tcp"}}, "required": ["transport"]},
+                "then": {
+                  "properties": {
+                    "security": {
+                      "properties": {"mode": {"enum": ["plain", "tls_server_auth", "mutual_tls"]}}
+                    }
+                  }
+                }
+              },
+              {
+                "if": {"properties": {"transport": {"const": "quic"}}, "required": ["transport"]},
+                "then": {
+                  "properties": {
+                    "security": {
+                      "properties": {"mode": {"enum": ["tls_server_auth", "mutual_tls"]}}
+                    }
+                  }
+                }
+              },
+              {
+                "if": {"properties": {"transport": {"const": "ipc"}}, "required": ["transport"]},
+                "then": {
+                  "properties": {
+                    "security": {"properties": {"mode": {"const": "plain"}}}
+                  }
+                }
+              },
+              {
+                "if": {"properties": {"transport": {"const": "websocket"}}, "required": ["transport"]},
+                "then": {
+                  "properties": {
+                    "security": {
+                      "properties": {"mode": {"enum": ["plain", "wss", "browser_host"]}}
+                    }
+                  }
+                }
+              }
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "hostRouteExpectation": {
+      "type": "object",
+      "properties": {
+        "selected_count": {"type": "integer", "minimum": 0},
+        "selected_transport": {"$ref": "#/$defs/transport"},
+        "rejection_reasons": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/rejectionReason"},
+          "uniqueItems": true
+        },
+        "bound_transports": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transport"},
+          "uniqueItems": true
+        },
+        "accepted_transports": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transport"},
+          "uniqueItems": true
+        },
+        "atomic_rollback": {"type": "boolean"},
+        "logical_set_closed": {"type": "boolean"},
+        "terminal_failure": {"type": "string", "minLength": 1}
+      },
+      "minProperties": 1,
+      "additionalProperties": false
     }
   },
   "required": ["protocol_version", "manifest_name", "scenarios"],
@@ -42,7 +180,6 @@
         "required": [
           "id",
           "mode",
-          "transport",
           "status",
           "feature",
           "required_capabilities",
@@ -60,9 +197,9 @@
             "enum": ["suite_as_client", "suite_as_server", "suite_as_proxy"]
           },
           "transport": {
-            "type": "string",
-            "enum": ["tcp", "quic", "websocket", "ipc"]
+            "$ref": "#/$defs/transport"
           },
+          "host_route": {"$ref": "#/$defs/hostRoute"},
           "status": {
             "type": "string",
             "enum": ["mandatory", "optional", "experimental", "deprecated"]
@@ -165,11 +302,27 @@
                   "minLength": 1
                 },
                 "uniqueItems": true
-              }
+              },
+              "route": {"$ref": "#/$defs/hostRouteExpectation"}
             },
             "additionalProperties": false
           }
         },
+        "oneOf": [
+          {"required": ["transport"], "not": {"required": ["host_route"]}},
+          {"required": ["host_route"], "not": {"required": ["transport"]}}
+        ],
+        "allOf": [
+          {
+            "if": {"required": ["host_route"]},
+            "then": {
+              "properties": {"expect": {"required": ["route"]}}
+            },
+            "else": {
+              "properties": {"expect": {"not": {"required": ["route"]}}}
+            }
+          }
+        ],
         "additionalProperties": false
       },
       "minItems": 1

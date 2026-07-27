@@ -3,6 +3,22 @@
   "protocol_version": "nnrp-1-preview4",
   "suite_version": "0.1.0",
   "target_name": "sample-preview4-target",
+  "host_route_providers": [
+    {
+      "transport": "tcp",
+      "provider_id": "official.tcp",
+      "installed": true,
+      "platforms": ["native"],
+      "security_modes": ["plain", "tls_server_auth", "mutual_tls"]
+    },
+    {
+      "transport": "ipc",
+      "provider_id": "official.ipc",
+      "installed": true,
+      "platforms": ["native"],
+      "security_modes": ["plain"]
+    }
+  ],
   "artifacts": {
     "results_path": "artifacts/wire-results.json",
     "evidence_dir": "artifacts/wire-evidence"
@@ -48,6 +64,38 @@
           "TRACE_CONTEXT",
           "RESULT_DROP_REASON"
         ]
+      }
+    },
+    {
+      "id": "wire.host-route.client.multi-route",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "native",
+        "application_endpoint": "nnrp://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/client-primary",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          },
+          {
+            "transport": "ipc",
+            "provider_id": "official.ipc",
+            "locator": "suite://allocate/ipc/client-secondary",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "The target client receives two live provider routes, reports both candidates, and adopts exactly one runtime carrier.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 2000}],
+      "expect": {
+        "terminal": "success",
+        "route": {"selected_count": 1, "atomic_rollback": false, "logical_set_closed": false}
       }
     }
   ]

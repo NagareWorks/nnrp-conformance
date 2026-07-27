@@ -38,6 +38,43 @@
       "evidence_paths": [
         "artifacts/wire-evidence/cancel-abort.jsonl"
       ]
+    },
+    {
+      "id": "wire.host-route.client.multi-route",
+      "outcome": "passed",
+      "terminal": "success",
+      "route_evidence": {
+        "application_endpoint": "nnrp://host-route.test",
+        "candidates": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "requested_locator": "suite://allocate/tcp/client-primary",
+            "locator_resolved": true,
+            "security_satisfied": true,
+            "selected": true
+          },
+          {
+            "transport": "ipc",
+            "provider_id": "official.ipc",
+            "requested_locator": "suite://allocate/ipc/client-secondary",
+            "locator_resolved": true,
+            "security_satisfied": true,
+            "selected": false
+          }
+        ],
+        "listeners": [],
+        "accepted_sessions": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "active_transport": "tcp"
+          }
+        ],
+        "atomic_rollback": false,
+        "logical_set_closed": false
+      },
+      "evidence_paths": ["artifacts/wire-evidence/client-multi-route.jsonl"]
     }
   ]
 }

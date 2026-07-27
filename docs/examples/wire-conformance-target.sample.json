@@ -37,6 +37,43 @@
         "tls": false
       }
     ],
+    "host_route_providers": [
+      {
+        "transport": "tcp",
+        "provider_id": "official.tcp",
+        "installed": true,
+        "platforms": ["native"],
+        "security_modes": ["plain", "tls_server_auth", "mutual_tls"]
+      },
+      {
+        "transport": "quic",
+        "provider_id": "official.quic",
+        "installed": true,
+        "platforms": ["native"],
+        "security_modes": ["tls_server_auth", "mutual_tls"]
+      },
+      {
+        "transport": "ipc",
+        "provider_id": "official.ipc",
+        "installed": true,
+        "platforms": ["native"],
+        "security_modes": ["plain"]
+      },
+      {
+        "transport": "websocket",
+        "provider_id": "browser.websocket",
+        "installed": true,
+        "platforms": ["browser"],
+        "security_modes": ["browser_host"]
+      },
+      {
+        "transport": "quic",
+        "provider_id": "official.quic.uninstalled",
+        "installed": false,
+        "platforms": ["native"],
+        "security_modes": ["tls_server_auth"]
+      }
+    ],
     "capabilities": [
       "control.cancel_abort",
       "control.priority_update",
@@ -50,7 +87,8 @@
       "control.result_drop_reason",
       "control.degrade_profile",
       "control.budget_update",
-      "object.lifecycle"
+      "object.lifecycle",
+      "host.routes"
     ],
     "limits": {
       "max_frame_bytes": 16777216,

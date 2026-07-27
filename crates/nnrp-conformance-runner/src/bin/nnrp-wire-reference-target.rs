@@ -163,6 +163,7 @@ fn write_target_manifest(
                     security: Some(tls),
                 },
             ],
+            host_route_providers: vec![],
             capabilities: vec![
                 "control.cancel_abort".to_string(),
                 "control.priority_update".to_string(),

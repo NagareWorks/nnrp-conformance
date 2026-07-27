@@ -1,0 +1,304 @@
+{
+  "$schema": "../../../schemas/wire-conformance-scenario.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "host-route-e2e",
+  "scenarios": [
+    {
+      "id": "wire.host-route.client.multi-route",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "native",
+        "application_endpoint": "nnrp://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/client-primary",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          },
+          {
+            "transport": "ipc",
+            "provider_id": "official.ipc",
+            "locator": "suite://allocate/ipc/client-secondary",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "The target client receives two live provider routes, reports both candidates, and adopts exactly one runtime carrier.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 2000}],
+      "expect": {
+        "terminal": "success",
+        "route": {"selected_count": 1, "atomic_rollback": false, "logical_set_closed": false}
+      }
+    },
+    {
+      "id": "wire.host-route.client.unresolved-no-fallback",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "native",
+        "application_endpoint": "nnrp://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/unresolved",
+            "security": {"mode": "plain", "credential_owner": "none"},
+            "injected_failures": ["route_unresolved"]
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "A forced route with no resolvable locator fails with route-unresolved and never falls back.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 1000}],
+      "expect": {
+        "terminal": "error",
+        "route": {"selected_count": 0, "rejection_reasons": ["route-unresolved"]}
+      }
+    },
+    {
+      "id": "wire.host-route.client.security-no-fallback",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "native",
+        "application_endpoint": "nnrps://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/insecure",
+            "security": {"mode": "plain", "credential_owner": "none"},
+            "injected_failures": ["security_incompatible"]
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "A forced route that cannot satisfy nnrps security intent fails without a weaker fallback.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 1000}],
+      "expect": {
+        "terminal": "error",
+        "route": {"selected_count": 0, "rejection_reasons": ["security-unsatisfied"]}
+      }
+    },
+    {
+      "id": "wire.host-route.server.multi-listener",
+      "mode": "suite_as_client",
+      "host_route": {
+        "role": "server",
+        "platform": "native",
+        "application_endpoint": "nnrp://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/server-primary",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          },
+          {
+            "transport": "ipc",
+            "provider_id": "official.ipc",
+            "locator": "suite://allocate/ipc/server-secondary",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "The target server binds one atomic listener set and accepts a session through every declared provider.",
+      "steps": [{"action": "connect_each_listener", "timeout_ms": 2000}],
+      "expect": {
+        "terminal": "success",
+        "route": {
+          "bound_transports": ["tcp", "ipc"],
+          "accepted_transports": ["tcp", "ipc"],
+          "atomic_rollback": false,
+          "logical_set_closed": false
+        }
+      }
+    },
+    {
+      "id": "wire.host-route.server.atomic-bind-rollback",
+      "mode": "suite_as_client",
+      "host_route": {
+        "role": "server",
+        "platform": "native",
+        "application_endpoint": "nnrp://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/rollback-opened",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          },
+          {
+            "transport": "ipc",
+            "provider_id": "official.ipc",
+            "locator": "suite://allocate/ipc/rollback-failed",
+            "security": {"mode": "plain", "credential_owner": "none"},
+            "injected_failures": ["bind_failure"]
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "One bind failure rolls back every listener already opened for the logical server.",
+      "steps": [{"action": "bind_routes", "timeout_ms": 1000}],
+      "expect": {"terminal": "error", "route": {"atomic_rollback": true, "logical_set_closed": true}}
+    },
+    {
+      "id": "wire.host-route.server.terminal-listener-failure",
+      "mode": "suite_as_client",
+      "host_route": {
+        "role": "server",
+        "platform": "native",
+        "application_endpoint": "nnrp://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/terminal-primary",
+            "security": {"mode": "plain", "credential_owner": "none"}
+          },
+          {
+            "transport": "ipc",
+            "provider_id": "official.ipc",
+            "locator": "suite://allocate/ipc/terminal-failed",
+            "security": {"mode": "plain", "credential_owner": "none"},
+            "injected_failures": ["terminal_listener_failure"]
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "A terminal listener failure closes the complete logical listener set instead of silently shrinking it.",
+      "steps": [{"action": "fail_listener", "timeout_ms": 2000}],
+      "expect": {
+        "terminal": "error",
+        "route": {"logical_set_closed": true, "terminal_failure": "official.ipc"}
+      }
+    },
+    {
+      "id": "wire.host-route.native.security-matrix",
+      "mode": "suite_as_client",
+      "host_route": {
+        "role": "server",
+        "platform": "native",
+        "application_endpoint": "nnrps://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/tls",
+            "security": {"mode": "tls_server_auth", "credential_owner": "target"}
+          },
+          {
+            "transport": "quic",
+            "provider_id": "official.quic",
+            "locator": "suite://allocate/quic/tls",
+            "security": {"mode": "tls_server_auth", "credential_owner": "target"}
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "Native nnrps routes keep route-local TCP and QUIC credentials while exposing one secure application endpoint.",
+      "steps": [{"action": "connect_each_listener", "timeout_ms": 3000}],
+      "expect": {
+        "terminal": "success",
+        "route": {"bound_transports": ["tcp", "quic"], "accepted_transports": ["tcp", "quic"]}
+      }
+    },
+    {
+      "id": "wire.host-route.browser.wss",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "browser",
+        "application_endpoint": "nnrps://host-route.test",
+        "routes": [
+          {
+            "transport": "websocket",
+            "provider_id": "browser.websocket",
+            "locator": "suite://allocate/websocket/wss",
+            "security": {"mode": "browser_host", "credential_owner": "host"}
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "A browser client uses host-owned WSS trust without native credential material or non-WebSocket fallbacks.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 2000}],
+      "expect": {
+        "terminal": "success",
+        "route": {"selected_count": 1, "selected_transport": "websocket"}
+      }
+    },
+    {
+      "id": "wire.host-route.client.known-uninstalled",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "native",
+        "application_endpoint": "nnrp://host-route.test",
+        "routes": [
+          {
+            "transport": "quic",
+            "provider_id": "official.quic.uninstalled",
+            "locator": "suite://allocate/quic/uninstalled",
+            "security": {"mode": "tls_server_auth", "credential_owner": "suite"}
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "A known provider that is not installed remains visible as local-unavailable and is never called.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 1000}],
+      "expect": {
+        "terminal": "error",
+        "route": {"selected_count": 0, "rejection_reasons": ["local-unavailable"]}
+      }
+    },
+    {
+      "id": "wire.host-route.client.rejection-precedence",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "native",
+        "application_endpoint": "nnrps://host-route.test",
+        "routes": [
+          {
+            "transport": "tcp",
+            "provider_id": "official.tcp",
+            "locator": "suite://allocate/tcp/combined-failure",
+            "security": {"mode": "plain", "credential_owner": "none"},
+            "injected_failures": ["route_unresolved", "security_incompatible"]
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "Combined route and security failures report route-unresolved first, matching the frozen rejection registry.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 1000}],
+      "expect": {
+        "terminal": "error",
+        "route": {"selected_count": 0, "rejection_reasons": ["route-unresolved"]}
+      }
+    }
+  ]
+}

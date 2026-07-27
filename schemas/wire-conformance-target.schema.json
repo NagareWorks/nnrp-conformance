@@ -19,6 +19,37 @@
         "private_key_pkcs8_der_path": {"type": "string", "minLength": 1}
       },
       "additionalProperties": false
+    },
+    "hostRouteProvider": {
+      "type": "object",
+      "required": ["transport", "provider_id", "installed", "platforms", "security_modes"],
+      "properties": {
+        "transport": {
+          "type": "string",
+          "enum": ["tcp", "quic", "websocket", "ipc"]
+        },
+        "provider_id": {"type": "string", "minLength": 1},
+        "installed": {
+          "type": "boolean",
+          "description": "Whether the target can invoke this provider. Known uninstalled providers remain declared so mandatory negative scenarios can verify local-unavailable without provider invocation."
+        },
+        "platforms": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["native", "browser"]},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "security_modes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["plain", "tls_server_auth", "mutual_tls", "wss", "browser_host"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": ["target_name", "protocol_version", "suite_version", "wire_conformance"],
@@ -119,6 +150,11 @@
           },
           "minItems": 1
         },
+        "host_route_providers": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/hostRouteProvider"},
+          "uniqueItems": true
+        },
         "capabilities": {
           "type": "array",
           "items": {
@@ -144,6 +180,27 @@
           "additionalProperties": false
         }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capabilities": {"contains": {"const": "host.routes"}}
+            },
+            "required": ["capabilities"]
+          },
+          "then": {
+            "required": ["host_route_providers"],
+            "properties": {
+              "host_route_providers": {"minItems": 1}
+            }
+          },
+          "else": {
+            "properties": {
+              "host_route_providers": {"maxItems": 0}
+            }
+          }
+        }
+      ],
       "additionalProperties": false
     }
   },
