@@ -3,6 +3,107 @@
   "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-case-results.schema.json",
   "title": "NNRP Wire-level Conformance Case Results",
   "type": "object",
+  "$defs": {
+    "transport": {
+      "type": "string",
+      "enum": ["tcp", "quic", "websocket", "ipc"]
+    },
+    "rejectionReason": {
+      "type": "string",
+      "enum": [
+        "policy-disallowed",
+        "local-unavailable",
+        "peer-unsupported",
+        "limit-exceeded",
+        "route-unresolved",
+        "security-unsatisfied",
+        "probe-missing",
+        "probe-failed"
+      ]
+    },
+    "routeEvidence": {
+      "type": "object",
+      "required": [
+        "application_endpoint",
+        "candidates",
+        "listeners",
+        "accepted_sessions",
+        "atomic_rollback",
+        "logical_set_closed"
+      ],
+      "properties": {
+        "application_endpoint": {"type": "string", "pattern": "^nnrps?://"},
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "transport",
+              "provider_id",
+              "requested_locator",
+              "locator_resolved",
+              "security_satisfied",
+              "selected"
+            ],
+            "properties": {
+              "transport": {"$ref": "#/$defs/transport"},
+              "provider_id": {"type": "string", "minLength": 1},
+              "requested_locator": {"type": "string", "minLength": 1},
+              "locator_resolved": {"type": "boolean"},
+              "security_satisfied": {"type": "boolean"},
+              "selected": {"type": "boolean"},
+              "rejection_reason": {"$ref": "#/$defs/rejectionReason"}
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {"selected": {"const": true}},
+                  "required": ["selected"]
+                },
+                "then": {"not": {"required": ["rejection_reason"]}}
+              }
+            ],
+            "additionalProperties": false
+          }
+        },
+        "listeners": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["transport", "provider_id", "requested_locator", "state"],
+            "properties": {
+              "transport": {"$ref": "#/$defs/transport"},
+              "provider_id": {"type": "string", "minLength": 1},
+              "requested_locator": {"type": "string", "minLength": 1},
+              "bound_endpoint": {"type": "string", "minLength": 1},
+              "state": {
+                "type": "string",
+                "enum": ["opened", "rolled_back", "accepted", "closed", "failed"]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "accepted_sessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["transport", "provider_id", "active_transport"],
+            "properties": {
+              "transport": {"$ref": "#/$defs/transport"},
+              "provider_id": {"type": "string", "minLength": 1},
+              "active_transport": {"$ref": "#/$defs/transport"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "atomic_rollback": {"type": "boolean"},
+        "logical_set_closed": {"type": "boolean"},
+        "terminal_failure": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
   "required": ["protocol_version", "suite_version", "target_name", "results"],
   "properties": {
     "$schema": {
@@ -64,6 +165,7 @@
             },
             "default": []
           },
+          "route_evidence": {"$ref": "#/$defs/routeEvidence"},
           "message": {
             "type": "string"
           },

@@ -16,7 +16,7 @@ boundary.
 | Wire suite manifest | `schemas/wire-conformance-suite.schema.json` | Suite | Freezes the preview4 runner modes, transport set, scenario manifests, and result schemas. |
 | Wire scenario manifest | `schemas/wire-conformance-scenario.schema.json` | Suite | Lists frame-level scenarios selected by target mode, transport, and capability tokens. |
 | Wire target manifest | `schemas/wire-conformance-target.schema.json` | Target implementation | Declares live endpoints and capabilities exposed to the wire runner. |
-| Wire execution plan | `schemas/wire-conformance-execution-plan.schema.json` | Runner | Contains the scenarios selected for a target and the expected artifact locations. |
+| Wire execution plan | `schemas/wire-conformance-execution-plan.schema.json` | Runner | Contains the scenarios selected for a target, the target provider-availability snapshot, and the expected artifact locations. |
 | Wire case results | `schemas/wire-conformance-case-results.schema.json` | Runner or target harness | Reports observed frames, terminal state, timing evidence, and failure messages. |
 
 The preview4 transport set is frozen as `tcp`, `quic`, `ipc`, and `websocket`. Implementations may
@@ -87,11 +87,13 @@ cargo run -p nnrp-conformance-runner -- \
   --evidence-dir artifacts/wire-evidence
 ```
 
-The plan contains only selected scenarios. A scenario is selected when all three gates match:
+The plan contains only selected scenarios. A scenario is selected when all applicable gates match:
 
 1. The target declares the scenario mode, such as `suite_as_client`.
-2. The target declares the scenario transport, such as `ipc`.
-3. The target declares every required capability token.
+2. A frame scenario uses a declared transport, such as `ipc`.
+3. A host-route scenario uses provider identities declared by the target, including explicit
+   known-but-uninstalled providers used by negative cases.
+4. The target declares every required capability token.
 
 ## Result report
 
@@ -153,6 +155,22 @@ adapter execution plan.
 Use wire execution when the implementation exposes a live NNRP endpoint and the goal is to prove
 cross-implementation protocol semantics. Wire execution consumes a target manifest and a wire
 execution plan.
+
+Host-route plans retain providers that are known but not installed. Such providers are not callable:
+the target must keep them unselected and report `local-unavailable`. This lets the suite execute the
+negative case and verify that no provider endpoint was contacted instead of silently filtering the
+case out during planning.
+
+Fault injection names are suite controls, not public rejection tokens. Their frozen mapping is:
+
+| Suite fixture control | Public evidence |
+|---|---|
+| `route_unresolved` | `route-unresolved` rejection |
+| `security_incompatible` | `security-unsatisfied` rejection |
+| `bind_failure` | Atomic listener rollback evidence |
+| `terminal_listener_failure` | Terminal listener and logical-set closure evidence |
+
+The public rejection field accepts only the eight values frozen by the transport rejection registry.
 
 The two paths should not be collapsed:
 

@@ -439,8 +439,19 @@ pub struct WireConformanceTargetManifest {
 pub struct WireConformanceTarget {
     pub modes: Vec<WireConformanceMode>,
     pub transports: Vec<WireConformanceTransportEndpoint>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub host_route_providers: Vec<WireHostRouteProviderCapability>,
     pub capabilities: Vec<String>,
     pub limits: WireConformanceLimits,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostRouteProviderCapability {
+    pub transport: WireConformanceTransport,
+    pub provider_id: String,
+    pub installed: bool,
+    pub platforms: Vec<WireHostPlatform>,
+    pub security_modes: Vec<WireHostRouteSecurityMode>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -490,6 +501,7 @@ pub struct WireConformanceExecutionPlan {
     pub protocol_version: String,
     pub suite_version: String,
     pub target_name: String,
+    pub host_route_providers: Vec<WireHostRouteProviderCapability>,
     pub artifacts: AdapterArtifactContext,
     pub scenarios: Vec<WireConformanceScenario>,
 }
@@ -498,13 +510,82 @@ pub struct WireConformanceExecutionPlan {
 pub struct WireConformanceScenario {
     pub id: String,
     pub mode: WireConformanceMode,
-    pub transport: WireConformanceTransport,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transport: Option<WireConformanceTransport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host_route: Option<WireHostRouteFixture>,
     pub status: CaseStatus,
     pub feature: String,
     pub required_capabilities: Vec<String>,
     pub description: String,
     pub steps: Vec<WireConformanceStep>,
     pub expect: WireConformanceExpectation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostRouteFixture {
+    pub role: WireHostRole,
+    pub platform: WireHostPlatform,
+    pub application_endpoint: String,
+    pub routes: Vec<WireHostProviderRoute>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostProviderRoute {
+    pub transport: WireConformanceTransport,
+    pub provider_id: String,
+    pub locator: String,
+    pub security: WireHostRouteSecurity,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub injected_failures: Vec<WireHostRouteInjectedFailure>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostRouteSecurity {
+    pub mode: WireHostRouteSecurityMode,
+    pub credential_owner: WireHostCredentialOwner,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireHostRole {
+    Client,
+    Server,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireHostPlatform {
+    Native,
+    Browser,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireHostRouteSecurityMode {
+    Plain,
+    TlsServerAuth,
+    MutualTls,
+    Wss,
+    BrowserHost,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireHostCredentialOwner {
+    None,
+    Suite,
+    Target,
+    Host,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireHostRouteInjectedFailure {
+    RouteUnresolved,
+    SecurityIncompatible,
+    BindFailure,
+    TerminalListenerFailure,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -523,6 +604,28 @@ pub struct WireConformanceExpectation {
     pub terminal: WireConformanceTerminal,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub frames: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route: Option<WireHostRouteExpectation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostRouteExpectation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_transport: Option<WireConformanceTransport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rejection_reasons: Vec<WireHostRouteRejectionReason>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bound_transports: Vec<WireConformanceTransport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accepted_transports: Vec<WireConformanceTransport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub atomic_rollback: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logical_set_closed: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terminal_failure: Option<String>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -552,9 +655,75 @@ pub struct WireConformanceCaseResult {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub observed_frames: Vec<WireConformanceObservedFrame>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_evidence: Option<WireHostRouteEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostRouteEvidence {
+    pub application_endpoint: String,
+    pub candidates: Vec<WireHostRouteCandidateEvidence>,
+    pub listeners: Vec<WireHostListenerEvidence>,
+    pub accepted_sessions: Vec<WireHostAcceptedSessionEvidence>,
+    pub atomic_rollback: bool,
+    pub logical_set_closed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terminal_failure: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostRouteCandidateEvidence {
+    pub transport: WireConformanceTransport,
+    pub provider_id: String,
+    pub requested_locator: String,
+    pub locator_resolved: bool,
+    pub security_satisfied: bool,
+    pub selected: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rejection_reason: Option<WireHostRouteRejectionReason>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WireHostRouteRejectionReason {
+    PolicyDisallowed,
+    LocalUnavailable,
+    PeerUnsupported,
+    LimitExceeded,
+    RouteUnresolved,
+    SecurityUnsatisfied,
+    ProbeMissing,
+    ProbeFailed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostListenerEvidence {
+    pub transport: WireConformanceTransport,
+    pub provider_id: String,
+    pub requested_locator: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bound_endpoint: Option<String>,
+    pub state: WireHostListenerState,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireHostListenerState {
+    Opened,
+    RolledBack,
+    Accepted,
+    Closed,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostAcceptedSessionEvidence {
+    pub transport: WireConformanceTransport,
+    pub provider_id: String,
+    pub active_transport: WireConformanceTransport,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -713,8 +882,8 @@ mod tests {
         CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest,
         WireConformanceCaseResultReport, WireConformanceExecutionPlan,
         WireConformanceScenarioManifest, WireConformanceSuiteManifest,
-        WireConformanceTargetManifest, WireConformanceTransport, build_vector_manifest,
-        load_json_file, validate_protocol_alignment, verify_vector_manifest,
+        WireConformanceTargetManifest, WireConformanceTransport, WireHostRouteRejectionReason,
+        build_vector_manifest, load_json_file, validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -1098,6 +1267,24 @@ mod tests {
                 .iter()
                 .any(|capability| capability == "control.cancel_abort")
         );
+        assert_eq!(manifest.wire_conformance.host_route_providers.len(), 5);
+        assert!(
+            manifest
+                .wire_conformance
+                .host_route_providers
+                .iter()
+                .any(|provider| provider.provider_id == "browser.websocket" && provider.installed)
+        );
+        assert!(
+            manifest
+                .wire_conformance
+                .host_route_providers
+                .iter()
+                .any(
+                    |provider| provider.provider_id == "official.quic.uninstalled"
+                        && !provider.installed
+                )
+        );
     }
 
     #[test]
@@ -1113,8 +1300,20 @@ mod tests {
         .expect("wire conformance execution plan example should load");
 
         assert_eq!(plan.protocol_version, "nnrp-1-preview4");
-        assert_eq!(plan.scenarios.len(), 1);
+        assert_eq!(plan.scenarios.len(), 2);
+        assert_eq!(plan.host_route_providers.len(), 2);
+        assert!(
+            plan.host_route_providers
+                .iter()
+                .all(|provider| provider.installed)
+        );
         assert_eq!(plan.scenarios[0].required_capabilities.len(), 3);
+        let host_route = plan.scenarios[1]
+            .host_route
+            .as_ref()
+            .expect("execution plan example should preserve the suite-owned host route");
+        assert_eq!(host_route.application_endpoint, "nnrp://host-route.test");
+        assert_eq!(host_route.routes.len(), 2);
     }
 
     #[test]
@@ -1130,8 +1329,28 @@ mod tests {
         .expect("wire conformance case results example should load");
 
         assert_eq!(report.protocol_version, "nnrp-1-preview4");
-        assert_eq!(report.results.len(), 1);
+        assert_eq!(report.results.len(), 2);
         assert_eq!(report.results[0].observed_frames.len(), 3);
+        let route_evidence = report.results[1]
+            .route_evidence
+            .as_ref()
+            .expect("case result example should report route evidence");
+        assert_eq!(route_evidence.candidates.len(), 2);
+        assert_eq!(
+            route_evidence
+                .candidates
+                .iter()
+                .filter(|candidate| candidate.selected)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn wire_host_route_rejection_reason_rejects_unknown_tokens() {
+        let error = serde_json::from_str::<WireHostRouteRejectionReason>("\"private-reason\"")
+            .expect_err("wire evidence must use the frozen rejection registry");
+        assert!(error.to_string().contains("unknown variant"));
     }
 
     #[test]
@@ -1146,7 +1365,9 @@ mod tests {
                 .expect("wire conformance suite manifest should load");
 
         assert_eq!(manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(manifest.scenario_manifests.len(), 1);
+        assert_eq!(manifest.scenario_manifests.len(), 2);
+
+        let mut all_scenarios = Vec::new();
 
         for scenario_path in &manifest.scenario_manifests {
             let scenarios: WireConformanceScenarioManifest =
@@ -1155,30 +1376,55 @@ mod tests {
                 });
 
             assert_eq!(scenarios.protocol_version, manifest.protocol_version);
-            assert!(
-                scenarios
-                    .scenarios
-                    .iter()
-                    .any(|scenario| scenario.feature == "control.cancel_abort")
-            );
-
-            let cache_scenario = scenarios
-                .scenarios
-                .iter()
-                .find(|scenario| scenario.feature == "control.capability_route_cache")
-                .expect("wire suite should include the canonical cache identity scenario");
-            for frame in ["CACHE_REFERENCE", "CACHE_MISS"] {
-                let payload = cache_scenario
-                    .steps
-                    .iter()
-                    .find(|step| step.frame.as_deref() == Some(frame))
-                    .and_then(|step| step.payload.as_ref())
-                    .unwrap_or_else(|| panic!("{frame} should declare its cache identity"));
-                assert_eq!(payload["cache_namespace"], 1);
-                assert_eq!(payload["cache_key_hi"], "1234605616436508552");
-                assert_eq!(payload["cache_key_lo"], "11072869122414935808");
-            }
+            all_scenarios.extend(scenarios.scenarios);
         }
+
+        assert_eq!(all_scenarios.len(), 16);
+        assert!(
+            all_scenarios
+                .iter()
+                .any(|scenario| scenario.feature == "control.cancel_abort")
+        );
+
+        let cache_scenario = all_scenarios
+            .iter()
+            .find(|scenario| scenario.feature == "control.capability_route_cache")
+            .expect("wire suite should include the canonical cache identity scenario");
+        for frame in ["CACHE_REFERENCE", "CACHE_MISS"] {
+            let payload = cache_scenario
+                .steps
+                .iter()
+                .find(|step| step.frame.as_deref() == Some(frame))
+                .and_then(|step| step.payload.as_ref())
+                .unwrap_or_else(|| panic!("{frame} should declare its cache identity"));
+            assert_eq!(payload["cache_namespace"], 1);
+            assert_eq!(payload["cache_key_hi"], "1234605616436508552");
+            assert_eq!(payload["cache_key_lo"], "11072869122414935808");
+        }
+
+        let host_route_scenarios = all_scenarios
+            .iter()
+            .filter(|scenario| scenario.feature == "host.routes")
+            .collect::<Vec<_>>();
+        assert_eq!(host_route_scenarios.len(), 10);
+        assert!(host_route_scenarios.iter().all(|scenario| {
+            scenario.status == CaseStatus::Mandatory && scenario.host_route.is_some()
+        }));
+        assert!(
+            host_route_scenarios
+                .iter()
+                .any(|scenario| scenario.id == "wire.host-route.client.multi-route")
+        );
+        assert!(
+            host_route_scenarios
+                .iter()
+                .any(|scenario| scenario.id == "wire.host-route.server.multi-listener")
+        );
+        assert!(
+            host_route_scenarios
+                .iter()
+                .any(|scenario| scenario.id == "wire.host-route.server.atomic-bind-rollback")
+        );
     }
 
     #[test]

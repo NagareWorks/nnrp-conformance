@@ -15,7 +15,8 @@
     "ipc"
   ],
   "scenario_manifests": [
-    "cases/runtime-control-e2e.json"
+    "cases/runtime-control-e2e.json",
+    "cases/host-route-e2e.json"
   ],
   "target_schema": "../../schemas/wire-conformance-target.schema.json",
   "execution_plan_schema": "../../schemas/wire-conformance-execution-plan.schema.json",

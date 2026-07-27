@@ -3,7 +3,7 @@
   "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-conformance-execution-plan.schema.json",
   "title": "NNRP Wire-level Conformance Execution Plan",
   "type": "object",
-  "required": ["protocol_version", "suite_version", "target_name", "artifacts", "scenarios"],
+  "required": ["protocol_version", "suite_version", "target_name", "host_route_providers", "artifacts", "scenarios"],
   "properties": {
     "$schema": {
       "type": "string"
@@ -19,6 +19,14 @@
     "target_name": {
       "type": "string",
       "minLength": 1
+    },
+    "host_route_providers": {
+      "type": "array",
+      "description": "Snapshot of target provider availability used to validate route evidence, including known uninstalled providers.",
+      "items": {
+        "$ref": "wire-conformance-target.schema.json#/$defs/hostRouteProvider"
+      },
+      "uniqueItems": true
     },
     "artifacts": {
       "type": "object",

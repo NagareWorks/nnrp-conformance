@@ -21,22 +21,22 @@ NNRP frames directly.
 - [x] Validate that cache-reference scenarios preserve `cache_namespace`, `cache_key_hi`, and
       `cache_key_lo` without collapsing the 128-bit key into a text alias.
 - [ ] Add suite-owned host-route scenarios without calling the target's own peer adapter.
-  - [ ] Add a multi-route client plan with at least two simultaneously available suite endpoints.
+  - [x] Add a multi-route client plan with at least two simultaneously available suite endpoints.
   - [ ] Assert deterministic candidate diagnostics and one selected runtime carrier.
-  - [ ] Add forced unresolved and security-incompatible client plans with no fallback.
+  - [x] Add forced unresolved and security-incompatible client plans with no fallback.
   - [ ] Add a multi-listener server plan and connect through every declared listener.
   - [ ] Assert every actual bound provider endpoint.
   - [ ] Assert active transport identity for each accepted server session.
   - [ ] Inject one server bind failure and assert atomic rollback evidence.
   - [ ] Inject one terminal listener failure and assert the logical set closes instead of shrinking.
-  - [ ] Add native and browser `nnrps://` security-intent matrices.
-  - [ ] Add known-but-uninstalled route and combined-failure rejection-precedence cases.
-- [ ] Extend target, execution-plan, and case-result schemas for route-set evidence.
-  - [ ] Represent application endpoint and transport-keyed provider routes separately.
-  - [ ] Record route-local locator and credential ownership without embedding secrets.
-  - [ ] Record every candidate rejection reason and selected transport.
-  - [ ] Record every opened, rolled-back, accepted, and closed server listener.
-  - [ ] Record every actual bound provider endpoint and terminal listener-set failure.
+  - [x] Add native and browser `nnrps://` security-intent matrices.
+  - [x] Add known-but-uninstalled route and combined-failure rejection-precedence cases.
+- [x] Extend target, execution-plan, and case-result schemas for route-set evidence.
+  - [x] Represent application endpoint and transport-keyed provider routes separately.
+  - [x] Record route-local locator and credential ownership without embedding secrets.
+  - [x] Record every candidate rejection reason and selected transport.
+  - [x] Record every opened, rolled-back, accepted, and closed server listener.
+  - [x] Record every actual bound provider endpoint and terminal listener-set failure.
 - [ ] Add CI reference targets proving the host-route scenarios fail for singular-role implementations.
 
 ## Exit criteria

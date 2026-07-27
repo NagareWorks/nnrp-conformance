@@ -14,8 +14,8 @@ use nnrp_conformance_fixtures::{
     CompatibilityMatrixEntry, ConformanceReport, FixtureError, ProtocolManifest, ReportCase,
     ReportStatusSummary, ReportSummary, WireConformanceCaseResult, WireConformanceCaseResultReport,
     WireConformanceExecutionPlan, WireConformanceFrameDirection, WireConformanceObservedFrame,
-    WireConformanceScenario, WireConformanceTargetManifest, WireConformanceTerminal,
-    validate_protocol_alignment,
+    WireConformanceScenario, WireConformanceTargetManifest, WireConformanceTerminal, WireHostRole,
+    WireHostRouteRejectionReason, validate_protocol_alignment,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -296,6 +296,42 @@ pub fn build_wire_conformance_execution_plan(
     for endpoint in &target_manifest.wire_conformance.transports {
         validate_wire_transport_endpoint(endpoint)?;
     }
+    let declares_host_routes = target_manifest
+        .wire_conformance
+        .capabilities
+        .iter()
+        .any(|capability| capability == "host.routes");
+    let has_host_route_providers = !target_manifest
+        .wire_conformance
+        .host_route_providers
+        .is_empty();
+    if declares_host_routes != has_host_route_providers {
+        return Err(FixtureError::Validation {
+            message: if declares_host_routes {
+                "target claims host.routes without declaring host-route providers".to_string()
+            } else {
+                "target declares host-route providers without claiming host.routes".to_string()
+            },
+        });
+    }
+    let mut declared_host_provider_identities = BTreeSet::new();
+    for provider in &target_manifest.wire_conformance.host_route_providers {
+        if provider.provider_id.is_empty() {
+            return Err(FixtureError::Validation {
+                message: "host-route provider id must not be empty".to_string(),
+            });
+        }
+        if !declared_host_provider_identities
+            .insert((provider.transport, provider.provider_id.as_str()))
+        {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "target repeats host-route provider {} for {:?}",
+                    provider.provider_id, provider.transport
+                ),
+            });
+        }
+    }
     let target_modes = target_manifest
         .wire_conformance
         .modes
@@ -308,6 +344,12 @@ pub fn build_wire_conformance_execution_plan(
         .iter()
         .map(|transport| transport.name)
         .collect::<BTreeSet<_>>();
+    let target_host_providers = target_manifest
+        .wire_conformance
+        .host_route_providers
+        .iter()
+        .map(|provider| (provider.transport, provider.provider_id.as_str()))
+        .collect::<BTreeSet<_>>();
     let target_capabilities = target_manifest
         .wire_conformance
         .capabilities
@@ -319,14 +361,29 @@ pub fn build_wire_conformance_execution_plan(
         .iter()
         .filter(|scenario| {
             target_modes.contains(&scenario.mode)
-                && target_transports.contains(&scenario.transport)
+                && scenario
+                    .transport
+                    .is_none_or(|transport| target_transports.contains(&transport))
+                && scenario.host_route.as_ref().is_none_or(|fixture| {
+                    fixture.routes.iter().all(|route| {
+                        target_host_providers
+                            .contains(&(route.transport, route.provider_id.as_str()))
+                    })
+                })
                 && scenario
                     .required_capabilities
                     .iter()
                     .all(|capability| target_capabilities.contains(capability))
         })
         .cloned()
-        .collect();
+        .collect::<Vec<_>>();
+
+    for scenario in &selected_scenarios {
+        validate_wire_scenario_shape(scenario)?;
+        if scenario.host_route.is_some() {
+            validate_wire_host_route_fixture(scenario, target_manifest)?;
+        }
+    }
 
     Ok(WireConformanceExecutionPlan {
         schema: Some(
@@ -336,9 +393,214 @@ pub fn build_wire_conformance_execution_plan(
         protocol_version: target_manifest.protocol_version.clone(),
         suite_version: target_manifest.suite_version.clone(),
         target_name: target_manifest.target_name.clone(),
+        host_route_providers: target_manifest
+            .wire_conformance
+            .host_route_providers
+            .clone(),
         artifacts,
         scenarios: selected_scenarios,
     })
+}
+
+fn validate_wire_scenario_shape(scenario: &WireConformanceScenario) -> Result<(), FixtureError> {
+    if scenario.transport.is_some() == scenario.host_route.is_some() {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire scenario {} must declare exactly one of transport or host_route",
+                scenario.id
+            ),
+        });
+    }
+    if scenario.host_route.is_some() != scenario.expect.route.is_some() {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire scenario {} must declare route expectations exactly when it declares host_route",
+                scenario.id
+            ),
+        });
+    }
+    if let Some(fixture) = &scenario.host_route {
+        let expected_mode = match fixture.role {
+            WireHostRole::Client => nnrp_conformance_fixtures::WireConformanceMode::SuiteAsServer,
+            WireHostRole::Server => nnrp_conformance_fixtures::WireConformanceMode::SuiteAsClient,
+        };
+        if scenario.mode != expected_mode {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} uses {:?} for a {:?} host route; expected {:?}",
+                    scenario.id, scenario.mode, fixture.role, expected_mode
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_wire_host_route_fixture(
+    scenario: &WireConformanceScenario,
+    target_manifest: &WireConformanceTargetManifest,
+) -> Result<(), FixtureError> {
+    use nnrp_conformance_fixtures::{
+        WireHostCredentialOwner, WireHostPlatform, WireHostRole, WireHostRouteSecurityMode,
+    };
+
+    let fixture = scenario
+        .host_route
+        .as_ref()
+        .expect("host-route fixture validation requires a host-route scenario");
+    let expected_route =
+        scenario
+            .expect
+            .route
+            .as_ref()
+            .ok_or_else(|| FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} has a host-route fixture without route expectations",
+                    scenario.id
+                ),
+            })?;
+
+    if !fixture.application_endpoint.starts_with("nnrp://")
+        && !fixture.application_endpoint.starts_with("nnrps://")
+    {
+        return Err(FixtureError::Validation {
+            message: "host-route application endpoint must use nnrp:// or nnrps://".to_string(),
+        });
+    }
+    if fixture.routes.is_empty() {
+        return Err(FixtureError::Validation {
+            message: "host-route fixture must declare at least one provider route".to_string(),
+        });
+    }
+
+    let mut identities = BTreeSet::new();
+    for route in &fixture.routes {
+        if route.provider_id.is_empty() || route.locator.is_empty() {
+            return Err(FixtureError::Validation {
+                message: "host-route provider id and locator must not be empty".to_string(),
+            });
+        }
+        if !identities.insert((route.transport, route.provider_id.as_str())) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "host-route fixture repeats provider {} for {:?}",
+                    route.provider_id, route.transport
+                ),
+            });
+        }
+        let provider = target_manifest
+            .wire_conformance
+            .host_route_providers
+            .iter()
+            .find(|provider| {
+                provider.transport == route.transport && provider.provider_id == route.provider_id
+            })
+            .ok_or_else(|| FixtureError::Validation {
+                message: format!(
+                    "target does not declare host-route provider {} for {:?}",
+                    route.provider_id, route.transport
+                ),
+            })?;
+        if !provider.platforms.contains(&fixture.platform) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "host-route provider {} does not support {:?}",
+                    route.provider_id, fixture.platform
+                ),
+            });
+        }
+        if !provider.security_modes.contains(&route.security.mode) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "host-route provider {} does not support {:?}",
+                    route.provider_id, route.security.mode
+                ),
+            });
+        }
+        if !provider.installed
+            && !expected_route
+                .rejection_reasons
+                .iter()
+                .any(|reason| *reason == WireHostRouteRejectionReason::LocalUnavailable)
+        {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} uses uninstalled provider {} without expecting local-unavailable",
+                    scenario.id, route.provider_id
+                ),
+            });
+        }
+        let transport_security_compatible = matches!(
+            (route.transport, route.security.mode),
+            (
+                nnrp_conformance_fixtures::WireConformanceTransport::Tcp,
+                WireHostRouteSecurityMode::Plain
+                    | WireHostRouteSecurityMode::TlsServerAuth
+                    | WireHostRouteSecurityMode::MutualTls
+            ) | (
+                nnrp_conformance_fixtures::WireConformanceTransport::Quic,
+                WireHostRouteSecurityMode::TlsServerAuth | WireHostRouteSecurityMode::MutualTls
+            ) | (
+                nnrp_conformance_fixtures::WireConformanceTransport::Ipc,
+                WireHostRouteSecurityMode::Plain
+            ) | (
+                nnrp_conformance_fixtures::WireConformanceTransport::Websocket,
+                WireHostRouteSecurityMode::Plain
+                    | WireHostRouteSecurityMode::Wss
+                    | WireHostRouteSecurityMode::BrowserHost
+            )
+        );
+        if !transport_security_compatible
+            || (fixture.platform == WireHostPlatform::Browser
+                && route.transport
+                    != nnrp_conformance_fixtures::WireConformanceTransport::Websocket)
+        {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "host-route provider {} uses incompatible {:?} security on {:?}",
+                    route.provider_id, route.security.mode, route.transport
+                ),
+            });
+        }
+        match (route.security.mode, route.security.credential_owner) {
+            (WireHostRouteSecurityMode::Plain, WireHostCredentialOwner::None) => {}
+            (WireHostRouteSecurityMode::BrowserHost, WireHostCredentialOwner::Host)
+                if fixture.platform == WireHostPlatform::Browser => {}
+            (WireHostRouteSecurityMode::TlsServerAuth, WireHostCredentialOwner::Suite)
+            | (WireHostRouteSecurityMode::TlsServerAuth, WireHostCredentialOwner::Target)
+            | (WireHostRouteSecurityMode::MutualTls, WireHostCredentialOwner::Suite)
+            | (WireHostRouteSecurityMode::MutualTls, WireHostCredentialOwner::Target)
+            | (WireHostRouteSecurityMode::Wss, WireHostCredentialOwner::Suite)
+            | (WireHostRouteSecurityMode::Wss, WireHostCredentialOwner::Target)
+                if fixture.platform == WireHostPlatform::Native => {}
+            _ => {
+                return Err(FixtureError::Validation {
+                    message: format!(
+                        "host-route provider {} has incompatible security ownership",
+                        route.provider_id
+                    ),
+                });
+            }
+        }
+    }
+
+    let expected_mode = match fixture.role {
+        WireHostRole::Client => nnrp_conformance_fixtures::WireConformanceMode::SuiteAsServer,
+        WireHostRole::Server => nnrp_conformance_fixtures::WireConformanceMode::SuiteAsClient,
+    };
+    if !target_manifest
+        .wire_conformance
+        .modes
+        .contains(&expected_mode)
+    {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "target does not declare {:?} required by the host-route {:?} role",
+                expected_mode, fixture.role
+            ),
+        });
+    }
+    Ok(())
 }
 
 fn validate_wire_transport_endpoint(
@@ -480,6 +742,7 @@ pub fn validate_wire_conformance_results(
                         });
                     }
                 }
+                validate_wire_route_evidence(expected_plan, expected_scenario, result)?;
                 summary.passed_scenarios += 1;
             }
             ApiProfileCaseOutcome::Failed => summary.failed_scenarios += 1,
@@ -497,6 +760,329 @@ pub fn validate_wire_conformance_results(
     }
 
     Ok(summary)
+}
+
+fn validate_wire_route_evidence(
+    plan: &WireConformanceExecutionPlan,
+    scenario: &WireConformanceScenario,
+    result: &WireConformanceCaseResult,
+) -> Result<(), FixtureError> {
+    let Some(expected) = scenario.expect.route.as_ref() else {
+        if result.route_evidence.is_some() {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} reports route evidence for a frame-only scenario",
+                    result.id
+                ),
+            });
+        }
+        return Ok(());
+    };
+    let evidence = result
+        .route_evidence
+        .as_ref()
+        .ok_or_else(|| FixtureError::Validation {
+            message: format!("wire result {} is missing route evidence", result.id),
+        })?;
+    let fixture = scenario
+        .host_route
+        .as_ref()
+        .ok_or_else(|| FixtureError::Validation {
+            message: format!(
+                "wire scenario {} expects route evidence without a host-route fixture",
+                scenario.id
+            ),
+        })?;
+
+    if evidence.application_endpoint != fixture.application_endpoint {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire result {} reports application endpoint {}, expected {}",
+                result.id, evidence.application_endpoint, fixture.application_endpoint
+            ),
+        });
+    }
+    if evidence.candidates.len() != fixture.routes.len() {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire result {} reports {} route candidate(s), expected {}",
+                result.id,
+                evidence.candidates.len(),
+                fixture.routes.len()
+            ),
+        });
+    }
+    let expected_candidate_identities = fixture
+        .routes
+        .iter()
+        .map(|route| {
+            (
+                route.transport,
+                route.provider_id.as_str(),
+                route.locator.as_str(),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    let actual_candidate_identities = evidence
+        .candidates
+        .iter()
+        .map(|candidate| {
+            (
+                candidate.transport,
+                candidate.provider_id.as_str(),
+                candidate.requested_locator.as_str(),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    if actual_candidate_identities != expected_candidate_identities
+        || actual_candidate_identities.len() != evidence.candidates.len()
+    {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire result {} candidate identities do not match the suite-owned route set",
+                result.id
+            ),
+        });
+    }
+    for candidate in &evidence.candidates {
+        let provider = plan
+            .host_route_providers
+            .iter()
+            .find(|provider| {
+                provider.transport == candidate.transport
+                    && provider.provider_id == candidate.provider_id
+            })
+            .ok_or_else(|| FixtureError::Validation {
+                message: format!(
+                    "wire result {} reports undeclared host-route provider {} for {:?}",
+                    result.id, candidate.provider_id, candidate.transport
+                ),
+            })?;
+        if candidate.selected && candidate.rejection_reason.is_some() {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} marks selected {:?} route as rejected",
+                    result.id, candidate.transport
+                ),
+            });
+        }
+        if !provider.installed
+            && (candidate.selected
+                || candidate.rejection_reason
+                    != Some(WireHostRouteRejectionReason::LocalUnavailable))
+        {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} must reject uninstalled provider {} as local-unavailable",
+                    result.id, candidate.provider_id
+                ),
+            });
+        }
+        if candidate.selected && (!candidate.locator_resolved || !candidate.security_satisfied) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} selected an unresolved or security-incompatible {:?} route",
+                    result.id, candidate.transport
+                ),
+            });
+        }
+    }
+
+    let selected_count = evidence
+        .candidates
+        .iter()
+        .filter(|candidate| candidate.selected)
+        .count();
+    if fixture.role == WireHostRole::Client && selected_count > 1 {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire result {} selected {} client carriers; at most one is permitted",
+                result.id, selected_count
+            ),
+        });
+    }
+
+    if let Some(count) = expected.selected_count {
+        if selected_count != count as usize {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} selected {} route(s), expected {}",
+                    result.id, selected_count, count
+                ),
+            });
+        }
+    }
+    if let Some(transport) = expected.selected_transport {
+        let selected = evidence
+            .candidates
+            .iter()
+            .any(|candidate| candidate.selected && candidate.transport == transport);
+        if !selected {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} did not select expected {:?} route",
+                    result.id, transport
+                ),
+            });
+        }
+    }
+
+    let actual_rejections = evidence
+        .candidates
+        .iter()
+        .filter_map(|candidate| candidate.rejection_reason)
+        .fold(BTreeMap::new(), |mut counts, reason| {
+            *counts.entry(reason).or_insert(0usize) += 1;
+            counts
+        });
+    let expected_rejections =
+        expected
+            .rejection_reasons
+            .iter()
+            .copied()
+            .fold(BTreeMap::new(), |mut counts, reason| {
+                *counts.entry(reason).or_insert(0usize) += 1;
+                counts
+            });
+    if actual_rejections != expected_rejections {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire result {} reports rejection reasons {:?}, expected {:?}",
+                result.id, actual_rejections, expected_rejections
+            ),
+        });
+    }
+
+    for listener in &evidence.listeners {
+        let known_route = fixture.routes.iter().any(|route| {
+            listener.transport == route.transport
+                && listener.provider_id == route.provider_id
+                && listener.requested_locator == route.locator
+        });
+        if !known_route {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} reports listener evidence outside the suite-owned route set",
+                    result.id
+                ),
+            });
+        }
+    }
+
+    let bound = evidence
+        .listeners
+        .iter()
+        .filter(|listener| listener.bound_endpoint.is_some())
+        .map(|listener| listener.transport)
+        .collect::<BTreeSet<_>>();
+    for transport in &expected.bound_transports {
+        if !bound.contains(transport) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} is missing bound {:?} listener",
+                    result.id, transport
+                ),
+            });
+        }
+    }
+
+    for session in &evidence.accepted_sessions {
+        if session.transport != session.active_transport {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} accepted a {:?} listener but reports {:?} as active",
+                    result.id, session.transport, session.active_transport
+                ),
+            });
+        }
+        if !fixture.routes.iter().any(|route| {
+            route.transport == session.transport && route.provider_id == session.provider_id
+        }) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} reports an accepted session outside the suite-owned route set",
+                    result.id
+                ),
+            });
+        }
+    }
+
+    let accepted_identities = evidence
+        .accepted_sessions
+        .iter()
+        .map(|session| (session.transport, session.provider_id.as_str()))
+        .collect::<BTreeSet<_>>();
+    if accepted_identities.len() != evidence.accepted_sessions.len() {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire result {} reports duplicate accepted-session evidence",
+                result.id
+            ),
+        });
+    }
+    if fixture.role == WireHostRole::Client {
+        let selected_identities = evidence
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.selected)
+            .map(|candidate| (candidate.transport, candidate.provider_id.as_str()))
+            .collect::<BTreeSet<_>>();
+        if accepted_identities != selected_identities {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} client accepted-session evidence does not match the selected carrier",
+                    result.id
+                ),
+            });
+        }
+    }
+
+    let accepted = evidence
+        .accepted_sessions
+        .iter()
+        .map(|session| session.active_transport)
+        .collect::<BTreeSet<_>>();
+    for transport in &expected.accepted_transports {
+        if !accepted.contains(transport) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire result {} is missing accepted {:?} session",
+                    result.id, transport
+                ),
+            });
+        }
+    }
+
+    if expected
+        .atomic_rollback
+        .is_some_and(|value| value != evidence.atomic_rollback)
+    {
+        return Err(FixtureError::Validation {
+            message: format!("wire result {} atomic rollback mismatch", result.id),
+        });
+    }
+    if expected
+        .logical_set_closed
+        .is_some_and(|value| value != evidence.logical_set_closed)
+    {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire result {} logical listener-set state mismatch",
+                result.id
+            ),
+        });
+    }
+    if expected.terminal_failure.as_deref() != evidence.terminal_failure.as_deref()
+        && expected.terminal_failure.is_some()
+    {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire result {} terminal listener failure mismatch",
+                result.id
+            ),
+        });
+    }
+    Ok(())
 }
 
 pub async fn run_wire_conformance_external(
@@ -582,15 +1168,21 @@ async fn run_wire_external_scenario(
     target_manifest_path: &Path,
     scenario: &WireConformanceScenario,
 ) -> Result<WireConformanceCaseResult, FixtureError> {
+    let transport = scenario.transport.ok_or_else(|| FixtureError::Validation {
+        message: format!(
+            "host-route scenario {} requires the host-route executor",
+            scenario.id
+        ),
+    })?;
     let endpoint_manifest = target_manifest
         .wire_conformance
         .transports
         .iter()
-        .find(|endpoint| endpoint.name == scenario.transport)
+        .find(|endpoint| endpoint.name == transport)
         .ok_or_else(|| FixtureError::Validation {
             message: format!(
                 "target manifest does not declare {:?} transport endpoint",
-                scenario.transport
+                transport
             ),
         })?;
     let case = wire_external_case_for_scenario(scenario)?;
@@ -606,6 +1198,7 @@ async fn run_wire_external_scenario(
             outcome: ApiProfileCaseOutcome::Failed,
             terminal: WireConformanceTerminal::Error,
             observed_frames: Vec::new(),
+            route_evidence: None,
             message: Some(format!("external wire target failed: {error}")),
             evidence_paths,
         }),
@@ -614,6 +1207,7 @@ async fn run_wire_external_scenario(
             outcome: ApiProfileCaseOutcome::Failed,
             terminal: WireConformanceTerminal::Error,
             observed_frames: Vec::new(),
+            route_evidence: None,
             message: Some(format!(
                 "external wire target exceeded {} ms execution timeout",
                 timeout.as_millis()
@@ -647,7 +1241,7 @@ fn wire_external_case_for_scenario(
         }
     };
     if wire_mode(case.mode()) != scenario.mode
-        || wire_transport(case.transport()) != scenario.transport
+        || Some(wire_transport(case.transport())) != scenario.transport
     {
         return Err(FixtureError::Validation {
             message: format!(
@@ -733,6 +1327,7 @@ fn wire_external_case_result(
                 timestamp_us: Some(u64::try_from(frame.timestamp_us).unwrap_or(u64::MAX)),
             })
             .collect(),
+        route_evidence: None,
         message: Some(format!(
             "external wire target executed {:?} over {:?} in {} us",
             report.mode, report.transport, report.elapsed_us
@@ -1588,7 +2183,12 @@ mod tests {
         WireConformanceLimits, WireConformanceMode, WireConformanceObservedFrame,
         WireConformanceScenario, WireConformanceStep, WireConformanceTarget,
         WireConformanceTargetManifest, WireConformanceTerminal, WireConformanceTransport,
-        WireConformanceTransportEndpoint, WireConformanceTransportSecurity, load_json_file,
+        WireConformanceTransportEndpoint, WireConformanceTransportSecurity,
+        WireHostAcceptedSessionEvidence, WireHostCredentialOwner, WireHostPlatform,
+        WireHostProviderRoute, WireHostRole, WireHostRouteCandidateEvidence, WireHostRouteEvidence,
+        WireHostRouteExpectation, WireHostRouteFixture, WireHostRouteProviderCapability,
+        WireHostRouteRejectionReason, WireHostRouteSecurity, WireHostRouteSecurityMode,
+        load_json_file,
     };
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
@@ -2375,6 +2975,7 @@ mod tests {
                     tls: false,
                     security: None,
                 }],
+                host_route_providers: vec![],
                 capabilities: vec![
                     "control.cancel_abort".to_string(),
                     "control.result_drop_reason".to_string(),
@@ -2396,7 +2997,8 @@ mod tests {
         WireConformanceScenario {
             id: id.to_string(),
             mode,
-            transport,
+            transport: Some(transport),
+            host_route: None,
             status: CaseStatus::Mandatory,
             feature: "wire.control".to_string(),
             required_capabilities: capabilities
@@ -2413,8 +3015,580 @@ mod tests {
             expect: WireConformanceExpectation {
                 terminal: WireConformanceTerminal::Cancelled,
                 frames: vec!["CANCEL_ACK".to_string()],
+                route: None,
             },
         }
+    }
+
+    fn sample_host_route_target() -> WireConformanceTargetManifest {
+        let mut target = sample_wire_target();
+        target
+            .wire_conformance
+            .modes
+            .push(WireConformanceMode::SuiteAsServer);
+        target
+            .wire_conformance
+            .capabilities
+            .push("host.routes".to_string());
+        target.wire_conformance.host_route_providers = vec![
+            WireHostRouteProviderCapability {
+                transport: WireConformanceTransport::Tcp,
+                provider_id: "official.tcp".to_string(),
+                installed: true,
+                platforms: vec![WireHostPlatform::Native],
+                security_modes: vec![WireHostRouteSecurityMode::Plain],
+            },
+            WireHostRouteProviderCapability {
+                transport: WireConformanceTransport::Ipc,
+                provider_id: "official.ipc".to_string(),
+                installed: true,
+                platforms: vec![WireHostPlatform::Native],
+                security_modes: vec![WireHostRouteSecurityMode::Plain],
+            },
+        ];
+        target
+    }
+
+    fn sample_host_route_scenario() -> WireConformanceScenario {
+        WireConformanceScenario {
+            id: "wire.host-route.client.multi-route".to_string(),
+            mode: WireConformanceMode::SuiteAsServer,
+            transport: None,
+            host_route: Some(WireHostRouteFixture {
+                role: WireHostRole::Client,
+                platform: WireHostPlatform::Native,
+                application_endpoint: "nnrp://host-route.test".to_string(),
+                routes: vec![
+                    WireHostProviderRoute {
+                        transport: WireConformanceTransport::Tcp,
+                        provider_id: "official.tcp".to_string(),
+                        locator: "suite://allocate/tcp/client-primary".to_string(),
+                        security: WireHostRouteSecurity {
+                            mode: WireHostRouteSecurityMode::Plain,
+                            credential_owner: WireHostCredentialOwner::None,
+                        },
+                        injected_failures: vec![],
+                    },
+                    WireHostProviderRoute {
+                        transport: WireConformanceTransport::Ipc,
+                        provider_id: "official.ipc".to_string(),
+                        locator: "suite://allocate/ipc/client-secondary".to_string(),
+                        security: WireHostRouteSecurity {
+                            mode: WireHostRouteSecurityMode::Plain,
+                            credential_owner: WireHostCredentialOwner::None,
+                        },
+                        injected_failures: vec![],
+                    },
+                ],
+            }),
+            status: CaseStatus::Mandatory,
+            feature: "host.routes".to_string(),
+            required_capabilities: vec!["host.routes".to_string()],
+            description: "Select one runtime carrier from two live routes.".to_string(),
+            steps: vec![WireConformanceStep {
+                action: "connect_routes".to_string(),
+                frame: None,
+                payload: None,
+                timeout_ms: Some(1000),
+            }],
+            expect: WireConformanceExpectation {
+                terminal: WireConformanceTerminal::Success,
+                frames: vec![],
+                route: Some(WireHostRouteExpectation {
+                    selected_count: Some(1),
+                    selected_transport: None,
+                    rejection_reasons: vec![],
+                    bound_transports: vec![],
+                    accepted_transports: vec![],
+                    atomic_rollback: Some(false),
+                    logical_set_closed: Some(false),
+                    terminal_failure: None,
+                }),
+            },
+        }
+    }
+
+    fn sample_host_route_evidence(selected_count: usize) -> WireHostRouteEvidence {
+        WireHostRouteEvidence {
+            application_endpoint: "nnrp://host-route.test".to_string(),
+            candidates: [
+                (WireConformanceTransport::Tcp, "official.tcp"),
+                (WireConformanceTransport::Ipc, "official.ipc"),
+            ]
+            .into_iter()
+            .enumerate()
+            .map(
+                |(index, (transport, provider_id))| WireHostRouteCandidateEvidence {
+                    transport,
+                    provider_id: provider_id.to_string(),
+                    requested_locator: match transport {
+                        WireConformanceTransport::Tcp => {
+                            "suite://allocate/tcp/client-primary".to_string()
+                        }
+                        WireConformanceTransport::Ipc => {
+                            "suite://allocate/ipc/client-secondary".to_string()
+                        }
+                        _ => unreachable!("sample fixture only uses TCP and IPC"),
+                    },
+                    locator_resolved: true,
+                    security_satisfied: true,
+                    selected: index < selected_count,
+                    rejection_reason: None,
+                },
+            )
+            .collect(),
+            listeners: vec![],
+            accepted_sessions: vec![WireHostAcceptedSessionEvidence {
+                transport: WireConformanceTransport::Tcp,
+                provider_id: "official.tcp".to_string(),
+                active_transport: WireConformanceTransport::Tcp,
+            }],
+            atomic_rollback: false,
+            logical_set_closed: false,
+            terminal_failure: None,
+        }
+    }
+
+    #[test]
+    fn wire_plan_and_results_preserve_suite_owned_host_route_evidence() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_host_route_target(),
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("host-route plan should build");
+        assert_eq!(plan.scenarios.len(), 1);
+        assert!(plan.scenarios[0].host_route.is_some());
+        assert_eq!(plan.host_route_providers.len(), 2);
+        let mut evidence = sample_host_route_evidence(1);
+        evidence.candidates.reverse();
+
+        let report = WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "wire.host-route.client.multi-route".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Success,
+                observed_frames: vec![],
+                route_evidence: Some(evidence),
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+        validate_wire_conformance_results(&plan, &report)
+            .expect("candidate array order should not affect route identity validation");
+    }
+
+    #[test]
+    fn wire_plan_and_results_enforce_uninstalled_provider_semantics() {
+        let mut target = sample_host_route_target();
+        target.wire_conformance.host_route_providers[0].installed = false;
+        let mut scenario = sample_host_route_scenario();
+        scenario
+            .expect
+            .route
+            .as_mut()
+            .expect("sample host route should have route expectations")
+            .rejection_reasons = vec![WireHostRouteRejectionReason::LocalUnavailable];
+        let plan = build_wire_conformance_execution_plan(
+            &target,
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("known uninstalled providers should remain in the execution plan");
+        assert!(!plan.host_route_providers[0].installed);
+
+        let mut evidence = sample_host_route_evidence(0);
+        evidence.candidates[0].rejection_reason =
+            Some(WireHostRouteRejectionReason::LocalUnavailable);
+        evidence.candidates[1].selected = true;
+        evidence.accepted_sessions[0] = WireHostAcceptedSessionEvidence {
+            transport: WireConformanceTransport::Ipc,
+            provider_id: "official.ipc".to_string(),
+            active_transport: WireConformanceTransport::Ipc,
+        };
+        let report = WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "wire.host-route.client.multi-route".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Success,
+                observed_frames: vec![],
+                route_evidence: Some(evidence),
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+        validate_wire_conformance_results(&plan, &report)
+            .expect("uninstalled provider must be visible but rejected without invocation");
+    }
+
+    #[test]
+    fn wire_plan_rejects_uninstalled_provider_without_local_unavailable_expectation() {
+        let mut target = sample_host_route_target();
+        target.wire_conformance.host_route_providers[0].installed = false;
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("uninstalled providers require an explicit local-unavailable oracle");
+        assert!(error.to_string().contains("local-unavailable"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_host_route_capability_without_providers() {
+        let mut target = sample_wire_target();
+        target
+            .wire_conformance
+            .capabilities
+            .push("host.routes".to_string());
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("host.routes without provider declarations must fail");
+        assert!(error.to_string().contains("without declaring"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_host_route_providers_without_capability() {
+        let mut target = sample_host_route_target();
+        target
+            .wire_conformance
+            .capabilities
+            .retain(|capability| capability != "host.routes");
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("provider declarations without host.routes must fail");
+        assert!(error.to_string().contains("without claiming"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_host_route_role_mode_mismatch() {
+        let target = sample_host_route_target();
+        let mut scenario = sample_host_route_scenario();
+        scenario.mode = WireConformanceMode::SuiteAsClient;
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("host-route role and suite mode must agree");
+        assert!(error.to_string().contains("host route"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_host_route_without_route_expectations() {
+        let target = sample_host_route_target();
+        let mut scenario = sample_host_route_scenario();
+        scenario.expect.route = None;
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("host-route scenarios require route expectations");
+        assert!(error.to_string().contains("exactly when"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_transport_scenario_with_route_expectations() {
+        let mut scenario = sample_wire_scenario(
+            "wire.control.invalid-route-oracle",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        );
+        scenario.expect.route = Some(WireHostRouteExpectation {
+            selected_count: Some(0),
+            selected_transport: None,
+            rejection_reasons: vec![],
+            bound_transports: vec![],
+            accepted_transports: vec![],
+            atomic_rollback: None,
+            logical_set_closed: None,
+            terminal_failure: None,
+        });
+        let error = build_wire_conformance_execution_plan(
+            &sample_wire_target(),
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("frame-only transport scenarios must not declare route expectations");
+        assert!(error.to_string().contains("exactly when"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_transport_security_mode_mismatch() {
+        let mut target = sample_host_route_target();
+        target.wire_conformance.host_route_providers[0]
+            .security_modes
+            .push(WireHostRouteSecurityMode::Wss);
+        let mut scenario = sample_host_route_scenario();
+        let tcp_route = &mut scenario
+            .host_route
+            .as_mut()
+            .expect("sample host route should exist")
+            .routes[0];
+        tcp_route.security = WireHostRouteSecurity {
+            mode: WireHostRouteSecurityMode::Wss,
+            credential_owner: WireHostCredentialOwner::Target,
+        };
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("TCP must not accept WebSocket security modes");
+        assert!(
+            error
+                .to_string()
+                .contains("incompatible Wss security on Tcp")
+        );
+    }
+
+    #[test]
+    fn wire_results_reject_multiple_active_client_carriers() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_host_route_target(),
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("host-route plan should build");
+        let report = WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "wire.host-route.client.multi-route".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Success,
+                observed_frames: vec![],
+                route_evidence: Some(sample_host_route_evidence(2)),
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+        let error = validate_wire_conformance_results(&plan, &report)
+            .expect_err("two selected carriers must fail one-carrier semantics");
+        assert!(
+            error
+                .to_string()
+                .contains("selected 2 client carriers; at most one is permitted")
+        );
+    }
+
+    #[test]
+    fn wire_results_reject_candidate_identity_drift() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_host_route_target(),
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("host-route plan should build");
+        let mut evidence = sample_host_route_evidence(1);
+        evidence.candidates[0].requested_locator =
+            "suite://allocate/tcp/target-substituted".to_string();
+        let report = WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "wire.host-route.client.multi-route".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Success,
+                observed_frames: vec![],
+                route_evidence: Some(evidence),
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+        let error = validate_wire_conformance_results(&plan, &report)
+            .expect_err("target-substituted route evidence must fail");
+        assert!(error.to_string().contains("suite-owned route"));
+    }
+
+    #[test]
+    fn wire_results_reject_selected_ineligible_route() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_host_route_target(),
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("host-route plan should build");
+        let mut evidence = sample_host_route_evidence(1);
+        evidence.candidates[0].security_satisfied = false;
+        let report = WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "wire.host-route.client.multi-route".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Success,
+                observed_frames: vec![],
+                route_evidence: Some(evidence),
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+        let error = validate_wire_conformance_results(&plan, &report)
+            .expect_err("selected security-incompatible route must fail");
+        assert!(error.to_string().contains("security-incompatible"));
+    }
+
+    #[test]
+    fn wire_results_reject_selected_route_with_rejection_reason() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_host_route_target(),
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("host-route plan should build");
+        let mut evidence = sample_host_route_evidence(1);
+        evidence.candidates[0].rejection_reason =
+            Some(WireHostRouteRejectionReason::RouteUnresolved);
+        let report = WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "wire.host-route.client.multi-route".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Success,
+                observed_frames: vec![],
+                route_evidence: Some(evidence),
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+        let error = validate_wire_conformance_results(&plan, &report)
+            .expect_err("selected candidate cannot simultaneously be rejected");
+        assert!(error.to_string().contains("marks selected"));
+    }
+
+    #[test]
+    fn wire_results_reject_client_session_on_unselected_carrier() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_host_route_target(),
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("host-route plan should build");
+        let mut evidence = sample_host_route_evidence(1);
+        evidence.accepted_sessions[0] = WireHostAcceptedSessionEvidence {
+            transport: WireConformanceTransport::Ipc,
+            provider_id: "official.ipc".to_string(),
+            active_transport: WireConformanceTransport::Ipc,
+        };
+        let report = WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "wire.host-route.client.multi-route".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Success,
+                observed_frames: vec![],
+                route_evidence: Some(evidence),
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+        let error = validate_wire_conformance_results(&plan, &report)
+            .expect_err("client session must use the selected carrier");
+        assert!(error.to_string().contains("does not match"));
+    }
+
+    #[test]
+    fn wire_results_reject_selected_client_carrier_without_session() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_host_route_target(),
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("host-route plan should build");
+        let mut evidence = sample_host_route_evidence(1);
+        evidence.accepted_sessions.clear();
+        let report = WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "wire.host-route.client.multi-route".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Success,
+                observed_frames: vec![],
+                route_evidence: Some(evidence),
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+        let error = validate_wire_conformance_results(&plan, &report)
+            .expect_err("selected client carrier requires session evidence");
+        assert!(error.to_string().contains("does not match"));
     }
 
     #[test]
@@ -2564,6 +3738,7 @@ mod tests {
                         payload: None,
                         timestamp_us: Some(100),
                     }],
+                    route_evidence: None,
                     message: None,
                     evidence_paths: vec![],
                 }],
@@ -2604,6 +3779,7 @@ mod tests {
                     outcome: ApiProfileCaseOutcome::Passed,
                     terminal: WireConformanceTerminal::Cancelled,
                     observed_frames: vec![],
+                    route_evidence: None,
                     message: None,
                     evidence_paths: vec![],
                 }],
