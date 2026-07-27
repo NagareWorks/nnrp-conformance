@@ -6,14 +6,14 @@
   "host_route_providers": [
     {
       "transport": "tcp",
-      "provider_id": "official.tcp",
+      "provider_id": "nnrp.transport.tcp.native",
       "installed": true,
       "platforms": ["native"],
       "security_modes": ["plain", "tls_server_auth", "mutual_tls"]
     },
     {
       "transport": "ipc",
-      "provider_id": "official.ipc",
+      "provider_id": "nnrp.transport.ipc.native",
       "installed": true,
       "platforms": ["native"],
       "security_modes": ["plain"]
@@ -76,13 +76,13 @@
         "routes": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "locator": "suite://allocate/tcp/client-primary",
             "security": {"mode": "plain", "credential_owner": "none"}
           },
           {
             "transport": "ipc",
-            "provider_id": "official.ipc",
+            "provider_id": "nnrp.transport.ipc.native",
             "locator": "suite://allocate/ipc/client-secondary",
             "security": {"mode": "plain", "credential_owner": "none"}
           }

@@ -1273,7 +1273,10 @@ mod tests {
                 .wire_conformance
                 .host_route_providers
                 .iter()
-                .any(|provider| provider.provider_id == "browser.websocket" && provider.installed)
+                .any(
+                    |provider| provider.provider_id == "nnrp.transport.websocket.browser-wasm"
+                        && provider.installed
+                )
         );
         assert!(
             manifest
@@ -1281,7 +1284,7 @@ mod tests {
                 .host_route_providers
                 .iter()
                 .any(
-                    |provider| provider.provider_id == "official.quic.uninstalled"
+                    |provider| provider.provider_id == "example.transport.quic.uninstalled"
                         && !provider.installed
                 )
         );

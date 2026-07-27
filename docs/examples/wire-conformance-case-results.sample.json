@@ -48,7 +48,7 @@
         "candidates": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "requested_locator": "suite://allocate/tcp/client-primary",
             "locator_resolved": true,
             "security_satisfied": true,
@@ -56,7 +56,7 @@
           },
           {
             "transport": "ipc",
-            "provider_id": "official.ipc",
+            "provider_id": "nnrp.transport.ipc.native",
             "requested_locator": "suite://allocate/ipc/client-secondary",
             "locator_resolved": true,
             "security_satisfied": true,
@@ -67,7 +67,7 @@
         "accepted_sessions": [
           {
             "transport": "tcp",
-            "provider_id": "official.tcp",
+            "provider_id": "nnrp.transport.tcp.native",
             "active_transport": "tcp"
           }
         ],

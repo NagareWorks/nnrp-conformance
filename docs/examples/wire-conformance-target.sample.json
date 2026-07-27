@@ -40,35 +40,35 @@
     "host_route_providers": [
       {
         "transport": "tcp",
-        "provider_id": "official.tcp",
+        "provider_id": "nnrp.transport.tcp.native",
         "installed": true,
         "platforms": ["native"],
         "security_modes": ["plain", "tls_server_auth", "mutual_tls"]
       },
       {
         "transport": "quic",
-        "provider_id": "official.quic",
+        "provider_id": "nnrp.transport.quic.native",
         "installed": true,
         "platforms": ["native"],
         "security_modes": ["tls_server_auth", "mutual_tls"]
       },
       {
         "transport": "ipc",
-        "provider_id": "official.ipc",
+        "provider_id": "nnrp.transport.ipc.native",
         "installed": true,
         "platforms": ["native"],
         "security_modes": ["plain"]
       },
       {
         "transport": "websocket",
-        "provider_id": "browser.websocket",
+        "provider_id": "nnrp.transport.websocket.browser-wasm",
         "installed": true,
         "platforms": ["browser"],
         "security_modes": ["browser_host"]
       },
       {
         "transport": "quic",
-        "provider_id": "official.quic.uninstalled",
+        "provider_id": "example.transport.quic.uninstalled",
         "installed": false,
         "platforms": ["native"],
         "security_modes": ["tls_server_auth"]
