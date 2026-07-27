@@ -15,8 +15,8 @@ use nnrp_conformance_runner::{
     build_adapter_execution_plan_for_manifests, build_api_profile_execution_plan,
     build_benchmark_execution_plan, build_execution_plan, build_execution_plan_for_manifests,
     build_wire_conformance_execution_plan, run_wire_conformance_external,
-    summarize_wire_external_report, validate_api_profile_results,
-    validate_wire_conformance_results,
+    run_wire_conformance_external_with_host_target, summarize_wire_external_report,
+    validate_api_profile_results, validate_wire_conformance_results,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -149,6 +149,8 @@ enum Command {
         target: PathBuf,
         #[arg(long)]
         output: Option<PathBuf>,
+        #[arg(long)]
+        host_route_target: Option<PathBuf>,
     },
 }
 
@@ -423,11 +425,21 @@ async fn main() -> Result<()> {
             plan,
             target,
             output,
+            host_route_target,
         } => {
             let wire_plan: WireConformanceExecutionPlan = load_json_file(&plan)?;
             let target_manifest: WireConformanceTargetManifest = load_json_file(&target)?;
-            let report =
-                run_wire_conformance_external(&wire_plan, &target_manifest, &target).await?;
+            let report = if let Some(host_route_target) = host_route_target.as_deref() {
+                run_wire_conformance_external_with_host_target(
+                    &wire_plan,
+                    &target_manifest,
+                    &target,
+                    Some(host_route_target),
+                )
+                .await?
+            } else {
+                run_wire_conformance_external(&wire_plan, &target_manifest, &target).await?
+            };
             write_wire_evidence(&wire_plan, &report)?;
             let output_path =
                 output.unwrap_or_else(|| PathBuf::from(&wire_plan.artifacts.results_path));

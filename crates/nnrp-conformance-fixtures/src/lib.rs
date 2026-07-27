@@ -647,6 +647,22 @@ pub struct WireConformanceCaseResultReport {
     pub results: Vec<WireConformanceCaseResult>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostRouteReadyReport {
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    pub protocol_version: String,
+    pub scenario_id: String,
+    pub listeners: Vec<WireHostReadyListener>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireHostReadyListener {
+    pub transport: WireConformanceTransport,
+    pub provider_id: String,
+    pub bound_endpoint: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WireConformanceCaseResult {
     pub id: String,
@@ -882,8 +898,9 @@ mod tests {
         CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest,
         WireConformanceCaseResultReport, WireConformanceExecutionPlan,
         WireConformanceScenarioManifest, WireConformanceSuiteManifest,
-        WireConformanceTargetManifest, WireConformanceTransport, WireHostRouteRejectionReason,
-        build_vector_manifest, load_json_file, validate_protocol_alignment, verify_vector_manifest,
+        WireConformanceTargetManifest, WireConformanceTransport, WireHostRouteReadyReport,
+        WireHostRouteRejectionReason, build_vector_manifest, load_json_file,
+        validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -1267,7 +1284,7 @@ mod tests {
                 .iter()
                 .any(|capability| capability == "control.cancel_abort")
         );
-        assert_eq!(manifest.wire_conformance.host_route_providers.len(), 5);
+        assert_eq!(manifest.wire_conformance.host_route_providers.len(), 4);
         assert!(
             manifest
                 .wire_conformance
@@ -1278,16 +1295,30 @@ mod tests {
                         && provider.installed
                 )
         );
-        assert!(
-            manifest
-                .wire_conformance
-                .host_route_providers
-                .iter()
-                .any(
-                    |provider| provider.provider_id == "example.transport.quic.uninstalled"
-                        && !provider.installed
-                )
-        );
+        let provider_transports = manifest
+            .wire_conformance
+            .host_route_providers
+            .iter()
+            .map(|provider| provider.transport)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(provider_transports.len(), 4);
+    }
+
+    #[test]
+    fn loads_host_route_only_wire_target_example() {
+        let manifest: WireConformanceTargetManifest = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("wire-conformance-host-route-target.sample.json"),
+        )
+        .expect("host-route-only wire target example should load");
+
+        assert!(manifest.wire_conformance.transports.is_empty());
+        assert_eq!(manifest.wire_conformance.host_route_providers.len(), 1);
+        assert!(!manifest.wire_conformance.host_route_providers[0].installed);
     }
 
     #[test]
@@ -1347,6 +1378,22 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn loads_wire_host_route_ready_example() {
+        let report: WireHostRouteReadyReport = load_json_file(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("docs")
+                .join("examples")
+                .join("wire-host-route-ready.sample.json"),
+        )
+        .expect("wire host-route readiness example should load");
+
+        assert_eq!(report.protocol_version, "nnrp-1-preview4");
+        assert_eq!(report.listeners.len(), 2);
     }
 
     #[test]

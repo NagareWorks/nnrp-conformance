@@ -147,8 +147,7 @@
               }
             ],
             "additionalProperties": false
-          },
-          "minItems": 1
+          }
         },
         "host_route_providers": {
           "type": "array",
@@ -199,6 +198,21 @@
               "host_route_providers": {"maxItems": 0}
             }
           }
+        },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "transports": {"minItems": 1}
+              }
+            },
+            {
+              "required": ["host_route_providers"],
+              "properties": {
+                "host_route_providers": {"minItems": 1}
+              }
+            }
+          ]
         }
       ],
       "additionalProperties": false

@@ -18,6 +18,7 @@ boundary.
 | Wire target manifest | `schemas/wire-conformance-target.schema.json` | Target implementation | Declares live endpoints and capabilities exposed to the wire runner. |
 | Wire execution plan | `schemas/wire-conformance-execution-plan.schema.json` | Runner | Contains the scenarios selected for a target, the target provider-availability snapshot, and the expected artifact locations. |
 | Wire case results | `schemas/wire-conformance-case-results.schema.json` | Runner or target harness | Reports observed frames, terminal state, timing evidence, and failure messages. |
+| Host-route readiness | `schemas/wire-host-route-ready.schema.json` | Host-route driver | Reports the actual provider endpoints after every server listener has bound. |
 
 The preview4 transport set is frozen as `tcp`, `quic`, `ipc`, and `websocket`. Implementations may
 declare only the transports they actually expose. The plan builder selects scenarios only when the
@@ -108,8 +109,33 @@ cargo run -p nnrp-conformance-runner -- \
   wire-run \
   --plan artifacts/wire-plan.json \
   --target docs/examples/wire-conformance-target.sample.json \
+  --host-route-target target/debug/nnrp-wire-host-route-reference-target \
   --output artifacts/wire-results.json
 ```
+
+Host-route cases use the executable supplied through `--host-route-target` as an independent SDK
+driver. The runner writes the frozen scenario plus a resolved copy containing suite-allocated
+provider locators, then invokes the driver with paths supplied by `--scenario`,
+`--resolved-scenario`, `--output`, `--ready-output`, and `--artifacts`, plus identity values supplied
+by `--suite-version` and `--target-name`. The driver must call the SDK's public
+multi-route client or multi-listener server API and emit one ordinary
+`WireConformanceCaseResultReport`; it does not encode, decode, or relay NNRP frames on the suite's
+behalf. A target manifest and each scenario route set must use at most one provider per canonical
+transport and must not repeat a provider ID.
+
+A target may expose frame-level transports, host-route providers, or both. The target schema
+requires at least one of those execution surfaces, so a host-route-only driver uses an empty
+`transports` array together with a non-empty `host_route_providers` array.
+
+For a successful server case, network locators use an OS-assigned port (`:0`). After the SDK has
+bound the complete logical listener set, the driver atomically writes a
+`WireHostRouteReadyReport` to `--ready-output`. The suite connects only to the actual endpoints in
+that report, so parallel runners never depend on a released port reservation.
+
+For client cases, the suite owns every live server endpoint and verifies the selected carrier from
+the accepted connection. For server cases, the suite connects through every listener and verifies
+rollback or logical-set closure by attempting to reconnect after the driver exits. A selected
+host-route case without a driver is a hard error and is never converted to `skipped`.
 
 The report keeps scenario IDs from the plan exactly, reports the terminal state, and includes the
 frames observed on the live connection. Every result points to a JSONL evidence file written by the
@@ -136,6 +162,13 @@ process binds TCP, QUIC, IPC, and secure WebSocket endpoints, writes a dynamic t
 implements the target half of the selected scenarios. `nnrp-conformance-runner` runs independently
 against that manifest. The two binaries share only the public wire protocol and manifest contract;
 the runner does not call a target adapter or target implementation function.
+
+CI also launches `nnrp-wire-host-route-reference-target` once per selected host-route scenario. The
+native installed-provider profile and the isolated uninstalled-QUIC profile together exercise nine
+route scenarios through the Rust SDK host APIs. Keeping those profiles separate preserves the
+one-provider-per-transport registry contract. Neither profile claims the browser WebSocket provider
+identity, so neither can impersonate or accidentally satisfy the browser WSS case; that case is
+selected only by a browser-capable target.
 
 The same path is available locally:
 
@@ -184,11 +217,12 @@ remains invalid/unset under the scheduling metadata contract.
 
 ## Current implementation boundary
 
-The current runner has typed executors for all six frozen preview4 wire scenarios and drives an
-independent target process over TCP, QUIC, IPC, and secure WebSocket endpoints. It writes JSONL
-evidence for every selected scenario and validates the generated result report. CI runs the complete
-path so the target manifest, TLS material, scenario manifests, result schema, timeout hints, proxy
-injection steps, terminal close evidence, and expected frame checks stay synchronized.
+The current runner has typed executors for all six frame-level preview4 scenarios and all ten
+host-route scenarios. Repository CI selects the six frame scenarios and nine native host-route
+scenarios across installed-provider and uninstalled-QUIC target profiles, drives independent target
+processes over TCP, QUIC, IPC, and secure WebSocket endpoints, and validates both generated result
+reports with zero skipped cases. The browser WSS scenario remains part of the mandatory suite and is
+selected when a target declares the browser provider identity.
 
 Third-party live endpoints use the same target manifest and execution-plan contract. Adapter
 execution remains separate and should not be used to prove wire-level semantics.

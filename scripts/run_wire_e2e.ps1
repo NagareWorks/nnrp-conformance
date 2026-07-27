@@ -9,19 +9,39 @@ $targetDirectory = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot "tar
 $executableSuffix = if ($IsWindows) { ".exe" } else { "" }
 $runnerExecutable = Join-Path $targetDirectory "nnrp-conformance-runner$executableSuffix"
 $targetExecutable = Join-Path $targetDirectory "nnrp-wire-reference-target$executableSuffix"
+$hostRouteTargetExecutable = Join-Path $targetDirectory "nnrp-wire-host-route-reference-target$executableSuffix"
 
 New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
 
 $targetManifest = Join-Path $artifactRoot "target.json"
 $executionPlan = Join-Path $artifactRoot "plan.json"
 $resultReport = Join-Path $artifactRoot "results.json"
+$uninstalledTargetManifest = Join-Path $artifactRoot "target-uninstalled-quic.json"
+$uninstalledExecutionPlan = Join-Path $artifactRoot "plan-uninstalled-quic.json"
+$uninstalledResultReport = Join-Path $artifactRoot "results-uninstalled-quic.json"
 $targetStdout = Join-Path $artifactRoot "target.stdout.log"
 $targetStderr = Join-Path $artifactRoot "target.stderr.log"
 $evidenceDirectory = Join-Path $artifactRoot "evidence"
+$uninstalledEvidenceDirectory = Join-Path $artifactRoot "evidence-uninstalled-quic"
 
-foreach ($path in @($targetManifest, $executionPlan, $resultReport, $targetStdout, $targetStderr)) {
+foreach ($path in @(
+  $targetManifest,
+  $executionPlan,
+  $resultReport,
+  $uninstalledTargetManifest,
+  $uninstalledExecutionPlan,
+  $uninstalledResultReport,
+  $targetStdout,
+  $targetStderr
+)) {
   if (Test-Path -LiteralPath $path) {
     Remove-Item -LiteralPath $path -Force
+  }
+}
+
+foreach ($path in @($evidenceDirectory, $uninstalledEvidenceDirectory)) {
+  if (Test-Path -LiteralPath $path) {
+    Remove-Item -LiteralPath $path -Recurse -Force
   }
 }
 
@@ -75,6 +95,7 @@ try {
   & $runnerExecutable wire-run `
     --plan $executionPlan `
     --target $targetManifest `
+    --host-route-target $hostRouteTargetExecutable `
     --output $resultReport
   if ($LASTEXITCODE -ne 0) {
     throw "wire-run failed with exit code $LASTEXITCODE."
@@ -103,4 +124,38 @@ try {
   $targetProcess.Dispose()
 }
 
+& $targetExecutable `
+  --manifest $uninstalledTargetManifest `
+  --profile uninstalled-quic
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to publish the uninstalled-QUIC target manifest."
+}
+
+& $runnerExecutable wire-plan `
+  --suite (Join-Path $repositoryRoot "wire-conformance/nnrp-1-preview4/manifest.json") `
+  --target $uninstalledTargetManifest `
+  --output $uninstalledExecutionPlan `
+  --results-path $uninstalledResultReport `
+  --evidence-dir $uninstalledEvidenceDirectory
+if ($LASTEXITCODE -ne 0) {
+  throw "uninstalled-QUIC wire-plan failed with exit code $LASTEXITCODE."
+}
+
+& $runnerExecutable wire-run `
+  --plan $uninstalledExecutionPlan `
+  --target $uninstalledTargetManifest `
+  --host-route-target $hostRouteTargetExecutable `
+  --output $uninstalledResultReport
+if ($LASTEXITCODE -ne 0) {
+  throw "uninstalled-QUIC wire-run failed with exit code $LASTEXITCODE."
+}
+
+& $runnerExecutable validate-wire-results `
+  --plan $uninstalledExecutionPlan `
+  --results $uninstalledResultReport
+if ($LASTEXITCODE -ne 0) {
+  throw "uninstalled-QUIC validate-wire-results failed with exit code $LASTEXITCODE."
+}
+
 Get-Content -LiteralPath $resultReport
+Get-Content -LiteralPath $uninstalledResultReport
