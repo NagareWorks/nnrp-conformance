@@ -79,8 +79,10 @@ function Assert-SingularRoleResult {
 
   $plan = Get-Content -LiteralPath $PlanPath -Raw | ConvertFrom-Json
   $report = Get-Content -LiteralPath $ResultPath -Raw | ConvertFrom-Json
-  if ($plan.scenarios.Count -ne 8) {
-    throw "$SupportedRole-only target expected the eight installed native host-route scenarios, got $($plan.scenarios.Count)."
+  $expectedPassed = @($plan.scenarios | Where-Object { $_.host_route.role -eq $SupportedRole }).Count
+  $expectedFailed = $plan.scenarios.Count - $expectedPassed
+  if ($expectedPassed -eq 0 -or $expectedFailed -eq 0) {
+    throw "$SupportedRole-only target plan must exercise both supported and unsupported host roles."
   }
   if ($plan.scenarios.Count -ne $report.results.Count) {
     throw "$SupportedRole-only target returned $($report.results.Count) results for $($plan.scenarios.Count) scenarios."
@@ -106,8 +108,8 @@ function Assert-SingularRoleResult {
       $failed += 1
     }
   }
-  if ($passed -ne 4 -or $failed -ne 4) {
-    throw "$SupportedRole-only target expected four supported and four rejected scenarios, got $passed and $failed."
+  if ($passed -ne $expectedPassed -or $failed -ne $expectedFailed) {
+    throw "$SupportedRole-only target expected $expectedPassed supported and $expectedFailed rejected scenarios, got $passed and $failed."
   }
 }
 
