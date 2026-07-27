@@ -65,13 +65,6 @@
         "installed": true,
         "platforms": ["browser"],
         "security_modes": ["browser_host"]
-      },
-      {
-        "transport": "quic",
-        "provider_id": "example.transport.quic.uninstalled",
-        "installed": false,
-        "platforms": ["native"],
-        "security_modes": ["tls_server_auth"]
       }
     ],
     "capabilities": [

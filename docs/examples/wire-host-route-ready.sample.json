@@ -1,0 +1,17 @@
+{
+  "$schema": "../../schemas/wire-host-route-ready.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "scenario_id": "wire.host-route.server.multi-listener",
+  "listeners": [
+    {
+      "transport": "tcp",
+      "provider_id": "nnrp.transport.tcp.native",
+      "bound_endpoint": "tcp://127.0.0.1:42101"
+    },
+    {
+      "transport": "ipc",
+      "provider_id": "nnrp.transport.ipc.native",
+      "bound_endpoint": "unix:///tmp/nnrp-host-route-example.sock"
+    }
+  ]
+}

@@ -20,15 +20,15 @@ NNRP frames directly.
 - [x] Add CI examples that launch the reference target as a separate process and exercise all selected roles over live endpoints.
 - [x] Validate that cache-reference scenarios preserve `cache_namespace`, `cache_key_hi`, and
       `cache_key_lo` without collapsing the 128-bit key into a text alias.
-- [ ] Add suite-owned host-route scenarios without calling the target's own peer adapter.
+- [x] Add suite-owned host-route scenarios without calling the target's own peer adapter.
   - [x] Add a multi-route client plan with at least two simultaneously available suite endpoints.
-  - [ ] Assert deterministic candidate diagnostics and one selected runtime carrier.
+  - [x] Assert deterministic candidate diagnostics and one selected runtime carrier.
   - [x] Add forced unresolved and security-incompatible client plans with no fallback.
-  - [ ] Add a multi-listener server plan and connect through every declared listener.
-  - [ ] Assert every actual bound provider endpoint.
-  - [ ] Assert active transport identity for each accepted server session.
-  - [ ] Inject one server bind failure and assert atomic rollback evidence.
-  - [ ] Inject one terminal listener failure and assert the logical set closes instead of shrinking.
+  - [x] Add a multi-listener server plan and connect through every declared listener.
+  - [x] Assert every actual bound provider endpoint.
+  - [x] Assert active transport identity for each accepted server session.
+  - [x] Inject one server bind failure and assert atomic rollback evidence.
+  - [x] Inject one terminal listener failure and assert the logical set closes instead of shrinking.
   - [x] Add native and browser `nnrps://` security-intent matrices.
   - [x] Add known-but-uninstalled route and combined-failure rejection-precedence cases.
 - [x] Extend target, execution-plan, and case-result schemas for route-set evidence.

@@ -135,15 +135,15 @@
         "application_endpoint": "nnrp://host-route.test",
         "routes": [
           {
-            "transport": "tcp",
-            "provider_id": "nnrp.transport.tcp.native",
-            "locator": "suite://allocate/tcp/rollback-opened",
+            "transport": "ipc",
+            "provider_id": "nnrp.transport.ipc.native",
+            "locator": "suite://allocate/ipc/rollback-opened",
             "security": {"mode": "plain", "credential_owner": "none"}
           },
           {
-            "transport": "ipc",
-            "provider_id": "nnrp.transport.ipc.native",
-            "locator": "suite://allocate/ipc/rollback-failed",
+            "transport": "tcp",
+            "provider_id": "nnrp.transport.tcp.native",
+            "locator": "suite://allocate/tcp/rollback-failed",
             "security": {"mode": "plain", "credential_owner": "none"},
             "injected_failures": ["bind_failure"]
           }
@@ -165,15 +165,15 @@
         "application_endpoint": "nnrp://host-route.test",
         "routes": [
           {
-            "transport": "tcp",
-            "provider_id": "nnrp.transport.tcp.native",
-            "locator": "suite://allocate/tcp/terminal-primary",
+            "transport": "ipc",
+            "provider_id": "nnrp.transport.ipc.native",
+            "locator": "suite://allocate/ipc/terminal-primary",
             "security": {"mode": "plain", "credential_owner": "none"}
           },
           {
-            "transport": "ipc",
-            "provider_id": "nnrp.transport.ipc.native",
-            "locator": "suite://allocate/ipc/terminal-failed",
+            "transport": "tcp",
+            "provider_id": "nnrp.transport.tcp.native",
+            "locator": "suite://allocate/tcp/terminal-failed",
             "security": {"mode": "plain", "credential_owner": "none"},
             "injected_failures": ["terminal_listener_failure"]
           }
@@ -186,7 +186,7 @@
       "steps": [{"action": "fail_listener", "timeout_ms": 2000}],
       "expect": {
         "terminal": "error",
-        "route": {"logical_set_closed": true, "terminal_failure": "nnrp.transport.ipc.native"}
+        "route": {"logical_set_closed": true, "terminal_failure": "nnrp.transport.tcp.native"}
       }
     },
     {

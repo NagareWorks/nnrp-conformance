@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NagareWorks/nnrp-conformance/schemas/wire-host-route-ready.schema.json",
+  "title": "NNRP Wire Host-route Driver Readiness",
+  "type": "object",
+  "required": ["protocol_version", "scenario_id", "listeners"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "protocol_version": {"type": "string", "const": "nnrp-1-preview4"},
+    "scenario_id": {"type": "string", "minLength": 1},
+    "listeners": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["transport", "provider_id", "bound_endpoint"],
+        "properties": {
+          "transport": {
+            "type": "string",
+            "enum": ["tcp", "quic", "websocket", "ipc"]
+          },
+          "provider_id": {"type": "string", "minLength": 1},
+          "bound_endpoint": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

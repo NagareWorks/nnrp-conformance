@@ -314,20 +314,27 @@ pub fn build_wire_conformance_execution_plan(
             },
         });
     }
-    let mut declared_host_provider_identities = BTreeSet::new();
+    let mut declared_host_transports = BTreeSet::new();
+    let mut declared_host_provider_ids = BTreeSet::new();
     for provider in &target_manifest.wire_conformance.host_route_providers {
         if provider.provider_id.is_empty() {
             return Err(FixtureError::Validation {
                 message: "host-route provider id must not be empty".to_string(),
             });
         }
-        if !declared_host_provider_identities
-            .insert((provider.transport, provider.provider_id.as_str()))
-        {
+        if !declared_host_transports.insert(provider.transport) {
             return Err(FixtureError::Validation {
                 message: format!(
-                    "target repeats host-route provider {} for {:?}",
-                    provider.provider_id, provider.transport
+                    "target declares more than one host-route provider for {:?}",
+                    provider.transport
+                ),
+            });
+        }
+        if !declared_host_provider_ids.insert(provider.provider_id.as_str()) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "target repeats host-route provider id {}",
+                    provider.provider_id
                 ),
             });
         }
@@ -473,18 +480,27 @@ fn validate_wire_host_route_fixture(
         });
     }
 
-    let mut identities = BTreeSet::new();
+    let mut transports = BTreeSet::new();
+    let mut provider_ids = BTreeSet::new();
     for route in &fixture.routes {
         if route.provider_id.is_empty() || route.locator.is_empty() {
             return Err(FixtureError::Validation {
                 message: "host-route provider id and locator must not be empty".to_string(),
             });
         }
-        if !identities.insert((route.transport, route.provider_id.as_str())) {
+        if !transports.insert(route.transport) {
             return Err(FixtureError::Validation {
                 message: format!(
-                    "host-route fixture repeats provider {} for {:?}",
-                    route.provider_id, route.transport
+                    "host-route fixture declares more than one route for {:?}",
+                    route.transport
+                ),
+            });
+        }
+        if !provider_ids.insert(route.provider_id.as_str()) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "host-route fixture repeats provider id {}",
+                    route.provider_id
                 ),
             });
         }
@@ -1090,14 +1106,45 @@ pub async fn run_wire_conformance_external(
     target_manifest: &WireConformanceTargetManifest,
     target_manifest_path: &Path,
 ) -> Result<WireConformanceCaseResultReport, FixtureError> {
+    run_wire_conformance_external_with_host_target(
+        plan,
+        target_manifest,
+        target_manifest_path,
+        None,
+    )
+    .await
+}
+
+pub async fn run_wire_conformance_external_with_host_target(
+    plan: &WireConformanceExecutionPlan,
+    target_manifest: &WireConformanceTargetManifest,
+    target_manifest_path: &Path,
+    host_route_target: Option<&Path>,
+) -> Result<WireConformanceCaseResultReport, FixtureError> {
     validate_wire_plan_target_alignment(plan, target_manifest)?;
 
     let mut results = Vec::with_capacity(plan.scenarios.len());
     for scenario in &plan.scenarios {
-        results.push(
+        let result = if scenario.host_route.is_some() {
+            let executable = host_route_target.ok_or_else(|| FixtureError::Validation {
+                message: format!(
+                    "host-route scenario {} requires --host-route-target",
+                    scenario.id
+                ),
+            })?;
+            host_route::run_host_route_scenario(
+                scenario,
+                executable,
+                Path::new(&plan.artifacts.evidence_dir),
+                &plan.suite_version,
+                &plan.target_name,
+            )
+            .await?
+        } else {
             run_wire_external_scenario(plan, target_manifest, target_manifest_path, scenario)
-                .await?,
-        );
+                .await?
+        };
+        results.push(result);
     }
 
     Ok(WireConformanceCaseResultReport {
@@ -3290,6 +3337,80 @@ mod tests {
     }
 
     #[test]
+    fn wire_plan_rejects_multiple_host_providers_for_one_transport() {
+        let mut target = sample_host_route_target();
+        let mut duplicate_transport = target.wire_conformance.host_route_providers[0].clone();
+        duplicate_transport.provider_id = "example.transport.tcp.alternate".to_string();
+        target
+            .wire_conformance
+            .host_route_providers
+            .push(duplicate_transport);
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("one host role must not register two providers for one transport");
+        assert!(
+            error
+                .to_string()
+                .contains("more than one host-route provider")
+        );
+    }
+
+    #[test]
+    fn wire_plan_rejects_reused_host_provider_id() {
+        let mut target = sample_host_route_target();
+        let mut duplicate_id = target.wire_conformance.host_route_providers[0].clone();
+        duplicate_id.transport = WireConformanceTransport::Websocket;
+        target
+            .wire_conformance
+            .host_route_providers
+            .push(duplicate_id);
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[sample_host_route_scenario()],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("provider IDs must remain unique across transports");
+        assert!(error.to_string().contains("repeats host-route provider id"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_multiple_fixture_routes_for_one_transport() {
+        let target = sample_host_route_target();
+        let mut scenario = sample_host_route_scenario();
+        let duplicate = scenario
+            .host_route
+            .as_ref()
+            .expect("sample host route should exist")
+            .routes[0]
+            .clone();
+        scenario
+            .host_route
+            .as_mut()
+            .expect("sample host route should exist")
+            .routes
+            .push(duplicate);
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("one host route set must not repeat a transport");
+        assert!(error.to_string().contains("more than one route"));
+    }
+
+    #[test]
     fn wire_plan_rejects_host_route_role_mode_mismatch() {
         let target = sample_host_route_target();
         let mut scenario = sample_host_route_scenario();
@@ -3842,3 +3963,4 @@ mod tests {
         assert!(error.to_string().contains("wire target name mismatch"));
     }
 }
+mod host_route;

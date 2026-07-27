@@ -1,0 +1,24 @@
+{
+  "$schema": "../../schemas/wire-conformance-target.schema.json",
+  "target_name": "host-route-only-preview4-target",
+  "protocol_version": "nnrp-1-preview4",
+  "suite_version": "0.1.0",
+  "wire_conformance": {
+    "modes": ["suite_as_server"],
+    "transports": [],
+    "host_route_providers": [
+      {
+        "transport": "quic",
+        "provider_id": "example.transport.quic.uninstalled",
+        "installed": false,
+        "platforms": ["native"],
+        "security_modes": ["tls_server_auth"]
+      }
+    ],
+    "capabilities": ["host.routes"],
+    "limits": {
+      "max_frame_bytes": 16777216,
+      "max_in_flight": 256
+    }
+  }
+}

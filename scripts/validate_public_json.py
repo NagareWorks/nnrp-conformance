@@ -203,6 +203,16 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
     if wire_target_example.exists():
         validate_json(schema_root / "wire-conformance-target.schema.json", wire_target_example, registry)
 
+    wire_host_route_target_example = (
+        docs_examples / "wire-conformance-host-route-target.sample.json"
+    )
+    if wire_host_route_target_example.exists():
+        validate_json(
+            schema_root / "wire-conformance-target.schema.json",
+            wire_host_route_target_example,
+            registry,
+        )
+
     wire_plan_example = docs_examples / "wire-conformance-execution-plan.sample.json"
     if wire_plan_example.exists():
         validate_json(
@@ -216,6 +226,14 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
         validate_json(
             schema_root / "wire-conformance-case-results.schema.json",
             wire_results_example,
+            registry,
+        )
+
+    wire_ready_example = docs_examples / "wire-host-route-ready.sample.json"
+    if wire_ready_example.exists():
+        validate_json(
+            schema_root / "wire-host-route-ready.schema.json",
+            wire_ready_example,
             registry,
         )
 
