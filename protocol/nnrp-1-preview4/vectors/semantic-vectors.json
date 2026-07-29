@@ -3,6 +3,22 @@
   "protocol_version": "nnrp-1-preview4",
   "vectors": [
     {
+      "recipe_type": "header",
+      "name": "preview4.header.all_caller_controlled_fields",
+      "description": "Preview4 common header vector with every caller-controlled field set to a distinct non-zero value.",
+      "version_major": 1,
+      "wire_format": 0,
+      "message_type": "frame_submit",
+      "flags": ["ack_required", "keyframe"],
+      "meta_len": 66051,
+      "body_len": 263430,
+      "session_id": 287454020,
+      "frame_id": 1432778632,
+      "view_id": 39338,
+      "route_id": 48076,
+      "trace_id": 72623859790382856
+    },
+    {
       "recipe_type": "u32_value",
       "name": "preview4.value.control_frame.cancel",
       "description": "Preview4 control frame id for CANCEL.",

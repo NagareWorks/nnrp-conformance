@@ -4,6 +4,7 @@
   "suite_version": "0.1.0",
   "status": "frozen",
   "case_manifests": [
+    "cases/common-header-core.json",
     "cases/runtime-control-core.json",
     "cases/runtime-object-core.json",
     "cases/runtime-control-optional.json",

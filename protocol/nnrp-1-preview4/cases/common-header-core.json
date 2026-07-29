@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "common-header-core",
+  "cases": [
+    {
+      "id": "l0.header.fixed_shape.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "header.fixed_shape",
+      "required_capabilities": [],
+      "description": "Parse and re-emit the canonical 40-byte Preview4 common header without changing version, wire format, message type, flags, lengths, session, frame, view, route, or trace fields. Native handle generation is not part of this wire projection."
+    }
+  ]
+}
