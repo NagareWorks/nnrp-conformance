@@ -1031,7 +1031,7 @@ mod tests {
                 .expect("preview4 example capability manifest should load");
 
         assert_eq!(protocol_manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(protocol_manifest.case_manifests.len(), 4);
+        assert_eq!(protocol_manifest.case_manifests.len(), 5);
 
         for relative_path in &protocol_manifest.case_manifests {
             let case_manifest: CaseManifest = load_json_file(protocol_root.join(relative_path))
@@ -1568,7 +1568,19 @@ mod tests {
                 .expect("preview4 semantic vectors should generate");
 
         assert_eq!(vector_manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(vector_manifest.vectors.len(), 22);
+        assert_eq!(vector_manifest.vectors.len(), 23);
+
+        let header = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| vector.name == "preview4.header.all_caller_controlled_fields")
+            .expect("complete common header vector should exist");
+        assert_eq!(header.kind, "header");
+        assert_eq!(header.bytes, 40);
+        assert_eq!(
+            header.hex,
+            "4e4e5250010010282100000003020100060504004433221188776655aa99ccbb0807060504030201"
+        );
 
         let cancel = vector_manifest
             .vectors
