@@ -131,6 +131,19 @@
       "value": 393219
     },
     {
+      "recipe_type": "typed_payload_descriptor_v4",
+      "name": "preview4.metadata.typed_payload_descriptor.token_partial",
+      "description": "Current 24-byte typed payload descriptor with an explicit per-frame token payload kind.",
+      "profile_id": 2,
+      "payload_kind": "token_chunk",
+      "descriptor_flags": 2,
+      "schema_id": 4097,
+      "schema_version": 3,
+      "stream_semantics": 2,
+      "offset": 8,
+      "length": 24
+    },
+    {
       "recipe_type": "object_reference_block_v4",
       "name": "preview4.object_reference.camera_block",
       "description": "Preview4 hot-path object reference with the canonical namespace and 128-bit cache key.",

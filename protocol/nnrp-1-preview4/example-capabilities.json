@@ -3,6 +3,7 @@
   "implementation_name": "preview4-reference-target",
   "protocol_version": "nnrp-1-preview4",
   "supports": [
+    "payload.typed",
     "control.cancel_abort",
     "control.priority_update",
     "control.deadline_expire",

@@ -224,6 +224,18 @@ pub enum SemanticVectorRecipe {
         offset: u32,
         length: u32,
     },
+    TypedPayloadDescriptorV4 {
+        name: String,
+        description: String,
+        profile_id: u16,
+        payload_kind: PayloadKindName,
+        descriptor_flags: u8,
+        schema_id: u32,
+        schema_version: u32,
+        stream_semantics: u16,
+        offset: u32,
+        length: u32,
+    },
     ResultHintPacket {
         name: String,
         description: String,
@@ -1345,6 +1357,35 @@ fn render_recipe(
             Ok((
                 name.clone(),
                 "object_reference".to_string(),
+                description.clone(),
+                payload,
+            ))
+        }
+        SemanticVectorRecipe::TypedPayloadDescriptorV4 {
+            name,
+            description,
+            profile_id,
+            payload_kind,
+            descriptor_flags,
+            schema_id,
+            schema_version,
+            stream_semantics,
+            offset,
+            length,
+        } => {
+            let mut payload = Vec::new();
+            push_u16(&mut payload, *profile_id);
+            push_u8(&mut payload, payload_kind.as_u8());
+            push_u8(&mut payload, *descriptor_flags);
+            push_u32(&mut payload, *schema_id);
+            push_u32(&mut payload, *schema_version);
+            push_u16(&mut payload, *stream_semantics);
+            push_u16(&mut payload, 0);
+            push_u32(&mut payload, *offset);
+            push_u32(&mut payload, *length);
+            Ok((
+                name.clone(),
+                "typed_payload_descriptor".to_string(),
                 description.clone(),
                 payload,
             ))
