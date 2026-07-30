@@ -20,10 +20,12 @@ use nnrp_conformance_fixtures::{
     WireConformanceTransportSecurity, WireHostPlatform, WireHostRouteProviderCapability,
     WireHostRouteSecurityMode,
 };
-use nnrp_core::{
-    FrameSubmitMetadata, InputProfile, MessageType, PayloadKindBitmap, SubmitMode, TileIndexMode,
+use nnrp_core::MessageType;
+use nnrp_runtime::{
+    NnrpRuntimeEventMetadata, NnrpRuntimeEventTail, NnrpServer, NnrpServerSession,
+    NnrpSubmitHeaderContext, NnrpSubmitIdentity, NnrpSubmitPolicy, NnrpSubmitRequest,
+    NnrpTokenChunk, NnrpTokenSubmitInput,
 };
-use nnrp_runtime::{NnrpClientEvent, NnrpServer, NnrpServerEvent, NnrpServerSession};
 use nnrp_transport_quic::QuicServerEndpointConfig;
 
 #[derive(Debug, Parser)]
@@ -317,7 +319,9 @@ async fn cancel_target(server: &NnrpServer) -> Result<()> {
     let mut session = server.accept().await?;
     let submit = session.receive_submit().await?;
     match session.await_event().await? {
-        NnrpServerEvent::Control(control) if control.message_type == MessageType::Cancel => {}
+        event
+            if event.header.message_type == MessageType::Cancel
+                && matches!(event.metadata, NnrpRuntimeEventMetadata::ControlRequest(_)) => {}
         event => bail!("cancel target expected CANCEL, got {event:?}"),
     }
     session
@@ -338,7 +342,9 @@ async fn priority_target(server: &NnrpServer) -> Result<()> {
     let submit = session.receive_submit().await?;
     for expected in [MessageType::PriorityUpdate, MessageType::ExpireAt] {
         match session.await_event().await? {
-            NnrpServerEvent::Scheduling(update) if update.message_type == expected => {}
+            event
+                if event.header.message_type == expected
+                    && matches!(event.metadata, NnrpRuntimeEventMetadata::Scheduling(_)) => {}
             event => bail!("priority target expected {expected:?}, got {event:?}"),
         }
     }
@@ -352,15 +358,21 @@ async fn cache_target(server: &NnrpServer) -> Result<()> {
     let mut session = server.accept().await?;
     let submit = session.receive_submit().await?;
     match session.await_event().await? {
-        NnrpServerEvent::Capability { .. } => {}
+        event
+            if event.header.message_type == MessageType::CapabilityNegotiation
+                && matches!(event.metadata, NnrpRuntimeEventMetadata::Capability(_)) => {}
         event => bail!("cache target expected CAPABILITY_NEGOTIATION, got {event:?}"),
     }
     match session.await_event().await? {
-        NnrpServerEvent::RouteHint { .. } => {}
+        event
+            if event.header.message_type == MessageType::RouteHint
+                && matches!(event.metadata, NnrpRuntimeEventMetadata::RouteHint(_)) => {}
         event => bail!("cache target expected ROUTE_HINT, got {event:?}"),
     }
     match session.await_event().await? {
-        NnrpServerEvent::CacheReference { .. } => {}
+        event
+            if event.header.message_type == MessageType::CacheReference
+                && matches!(event.metadata, NnrpRuntimeEventMetadata::CacheReference(_)) => {}
         event => bail!("cache target expected CACHE_REFERENCE, got {event:?}"),
     }
     session
@@ -382,25 +394,45 @@ async fn progress_target_with_retry(endpoint: WireReferenceEndpoint) -> Result<(
         match endpoint.connect().await {
             Ok(client) => {
                 let mut session = client.open_session().await?;
-                session
-                    .submit_nowait(token_submit(301), b"reference-target-request".to_vec())
-                    .await?;
+                session.submit_nowait(token_submit(301)?).await?;
                 match session.await_event().await? {
-                    NnrpClientEvent::Progress { .. } => {}
+                    event
+                        if event.header.message_type == MessageType::Progress
+                            && matches!(event.metadata, NnrpRuntimeEventMetadata::Progress(_)) => {}
                     event => bail!("progress target expected PROGRESS, got {event:?}"),
                 }
                 match session.await_event().await? {
-                    NnrpClientEvent::CreditUpdate(metadata) if metadata.credit_window == 1 => {}
+                    event
+                        if event.header.message_type == MessageType::CreditUpdate
+                            && matches!(
+                                event.metadata,
+                                NnrpRuntimeEventMetadata::Pressure(metadata)
+                                    if metadata.credit_window == 1
+                            ) => {}
                     event => bail!("progress target expected CREDIT_UPDATE, got {event:?}"),
                 }
                 match session.await_event().await? {
-                    NnrpClientEvent::PartialResult { .. } => {}
+                    event
+                        if event.header.message_type == MessageType::PartialResult
+                            && matches!(
+                                event.metadata,
+                                NnrpRuntimeEventMetadata::PartialResult(_)
+                            ) => {}
                     event => bail!("progress target expected PARTIAL_RESULT, got {event:?}"),
                 }
                 match session.await_event().await? {
-                    NnrpClientEvent::Result(result)
-                        if result.metadata == canonical_result()
-                            && result.body.as_slice() == canonical_response_body() => {}
+                    event
+                        if event.header.message_type == MessageType::ResultPush
+                            && matches!(
+                                event.metadata,
+                                NnrpRuntimeEventMetadata::ResultPush(metadata)
+                                    if metadata == canonical_result()
+                            )
+                            && matches!(
+                                &event.tail,
+                                NnrpRuntimeEventTail::Body(body)
+                                    if body.as_slice() == canonical_response_body()
+                            ) => {}
                     event => bail!("progress target expected canonical RESULT_PUSH, got {event:?}"),
                 }
                 session.close().await?;
@@ -424,32 +456,22 @@ async fn close_server_session(session: &mut NnrpServerSession) -> Result<()> {
     Ok(())
 }
 
-fn token_submit(operation_id: u64) -> FrameSubmitMetadata {
-    FrameSubmitMetadata {
-        src_width: 0,
-        src_height: 0,
-        tile_width: 0,
-        tile_height: 0,
-        tile_count: 0,
-        section_count: 0,
-        frame_class: 0,
-        input_profile: InputProfile::Unspecified,
-        tile_index_mode: TileIndexMode::DenseRange,
-        latency_budget_ms: 25,
-        target_fps_x100: 0,
-        retry_of_frame: 0,
-        tile_base_id: 0,
-        camera_bytes: 0,
-        tile_index_bytes: 0,
-        operation_id,
-        submit_mode: SubmitMode::Inline,
-        budget_policy: 0,
-        loss_tolerance_policy: 0,
-        object_ref_mask: 0,
-        dependency_frame_id: 0,
-        payload_kind_bitmap: PayloadKindBitmap(PayloadKindBitmap::TOKEN_CHUNK),
-        payload_frame_count: 1,
-    }
+fn token_submit(operation_id: u64) -> Result<NnrpSubmitRequest> {
+    Ok(NnrpSubmitRequest::token(NnrpTokenSubmitInput {
+        identity: NnrpSubmitIdentity {
+            operation_id,
+            frame_id: 1,
+            header: NnrpSubmitHeaderContext::default(),
+        },
+        policy: NnrpSubmitPolicy {
+            latency_budget_ms: 25,
+            ..NnrpSubmitPolicy::default()
+        },
+        chunks: vec![NnrpTokenChunk {
+            payload: b"reference-target-request".to_vec(),
+            descriptor_flags: 0,
+        }],
+    })?)
 }
 
 fn reserve_loopback_addr() -> Result<SocketAddr> {
