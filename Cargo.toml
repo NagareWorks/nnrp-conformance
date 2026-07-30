@@ -15,14 +15,14 @@ version = "0.1.0"
 anyhow = "1.0.100"
 async-trait = "0.1.89"
 clap = { version = "4.5.38", features = ["derive"] }
-nnrp-conformance = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "a00b77af4e13fc5a21473f6c90a288bd3d248fc7" }
-nnrp-core = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "a00b77af4e13fc5a21473f6c90a288bd3d248fc7" }
-nnrp-runtime = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "a00b77af4e13fc5a21473f6c90a288bd3d248fc7" }
-nnrp-transport-ipc = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "a00b77af4e13fc5a21473f6c90a288bd3d248fc7" }
-nnrp-transport-provider = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "a00b77af4e13fc5a21473f6c90a288bd3d248fc7" }
-nnrp-transport-quic = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "a00b77af4e13fc5a21473f6c90a288bd3d248fc7" }
-nnrp-transport-tcp = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "a00b77af4e13fc5a21473f6c90a288bd3d248fc7" }
-nnrp-transport-websocket = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "a00b77af4e13fc5a21473f6c90a288bd3d248fc7" }
+nnrp-conformance = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "d55c9721d436e44c7535fe7d210d49f1b9542e84" }
+nnrp-core = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "d55c9721d436e44c7535fe7d210d49f1b9542e84" }
+nnrp-runtime = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "d55c9721d436e44c7535fe7d210d49f1b9542e84" }
+nnrp-transport-ipc = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "d55c9721d436e44c7535fe7d210d49f1b9542e84" }
+nnrp-transport-provider = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "d55c9721d436e44c7535fe7d210d49f1b9542e84" }
+nnrp-transport-quic = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "d55c9721d436e44c7535fe7d210d49f1b9542e84" }
+nnrp-transport-tcp = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "d55c9721d436e44c7535fe7d210d49f1b9542e84" }
+nnrp-transport-websocket = { git = "https://github.com/NagareWorks/nnrp-rs.git", rev = "d55c9721d436e44c7535fe7d210d49f1b9542e84" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 thiserror = "2.0.17"
