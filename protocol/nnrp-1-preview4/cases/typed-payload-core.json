@@ -1,0 +1,17 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "typed-payload-core",
+  "cases": [
+    {
+      "id": "l0.typed_payload.descriptor.current.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "payload.typed",
+      "required_capabilities": [
+        "payload.typed"
+      ],
+      "description": "Parse and re-emit the current 24-byte typed payload descriptor with its explicit per-frame payload kind, schema binding, stream semantics, offset, and length."
+    }
+  ]
+}

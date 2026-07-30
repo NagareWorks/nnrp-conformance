@@ -1031,7 +1031,22 @@ mod tests {
                 .expect("preview4 example capability manifest should load");
 
         assert_eq!(protocol_manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(protocol_manifest.case_manifests.len(), 5);
+        assert_eq!(protocol_manifest.case_manifests.len(), 6);
+        assert!(
+            protocol_manifest
+                .case_manifests
+                .iter()
+                .any(|path| path == "cases/typed-payload-core.json")
+        );
+
+        let typed_payload_manifest: CaseManifest =
+            load_json_file(protocol_root.join("cases/typed-payload-core.json"))
+                .expect("preview4 typed payload case manifest should load");
+        assert_eq!(typed_payload_manifest.cases.len(), 1);
+        assert_eq!(
+            typed_payload_manifest.cases[0].id,
+            "l0.typed_payload.descriptor.current.golden"
+        );
 
         for relative_path in &protocol_manifest.case_manifests {
             let case_manifest: CaseManifest = load_json_file(protocol_root.join(relative_path))
@@ -1568,7 +1583,7 @@ mod tests {
                 .expect("preview4 semantic vectors should generate");
 
         assert_eq!(vector_manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(vector_manifest.vectors.len(), 23);
+        assert_eq!(vector_manifest.vectors.len(), 24);
 
         let header = vector_manifest
             .vectors
@@ -1597,6 +1612,20 @@ mod tests {
             .expect("object delta vector should exist");
         assert_eq!(object_delta.kind, "object_frame");
         assert_eq!(object_delta.bytes, 4);
+
+        let typed_descriptor = vector_manifest
+            .vectors
+            .iter()
+            .find(|vector| {
+                vector.name == "preview4.metadata.typed_payload_descriptor.token_partial"
+            })
+            .expect("preview4 typed payload descriptor vector should exist");
+        assert_eq!(typed_descriptor.kind, "typed_payload_descriptor");
+        assert_eq!(typed_descriptor.bytes, 24);
+        assert_eq!(
+            typed_descriptor.hex,
+            "020002020110000003000000020000000800000018000000"
+        );
 
         let expected_cache_vectors = [
             (
