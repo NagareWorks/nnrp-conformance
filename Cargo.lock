@@ -596,7 +596,7 @@ dependencies = [
 [[package]]
 name = "nnrp-conformance"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "http",
  "nnrp-core",
@@ -645,7 +645,7 @@ dependencies = [
 [[package]]
 name = "nnrp-core"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "thiserror",
 ]
@@ -653,7 +653,7 @@ dependencies = [
 [[package]]
 name = "nnrp-ffi"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "async-trait",
  "http",
@@ -667,7 +667,7 @@ dependencies = [
 [[package]]
 name = "nnrp-runtime"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -681,7 +681,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-ipc"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -693,7 +693,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-provider"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "nnrp-core",
  "thiserror",
@@ -702,7 +702,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-quic"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -718,7 +718,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-tcp"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -732,7 +732,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-websocket"
 version = "1.0.0-preview.4.20"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=d55c9721d436e44c7535fe7d210d49f1b9542e84#d55c9721d436e44c7535fe7d210d49f1b9542e84"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=9a6ac67081aa490ec48e272b706fcdd6d168ff8c#9a6ac67081aa490ec48e272b706fcdd6d168ff8c"
 dependencies = [
  "async-trait",
  "futures-util",
