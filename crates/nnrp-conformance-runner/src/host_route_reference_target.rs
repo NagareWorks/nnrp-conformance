@@ -159,12 +159,12 @@ async fn run_client_case(
         );
         providers.push(client_provider(route)?);
     }
-    let options = NnrpClientOptions {
-        endpoint: fixture.application_endpoint.parse()?,
-        provider_routes: routes,
-        transport_policy: TransportPolicy::Auto,
-        session: NnrpClientConfig::default(),
-    };
+    let options = NnrpClientOptions::new(
+        fixture.application_endpoint.parse()?,
+        routes,
+        TransportPolicy::Auto,
+        NnrpClientConfig::default(),
+    );
 
     match NnrpClient::connect(options, providers).await {
         Ok(client) => {
@@ -173,8 +173,8 @@ async fn run_client_case(
                 .context("provider-routed client did not retain transport selection")?
                 .clone();
             let session = client.open_session().await?;
-            let selected_transport = wire_transport(selection.selected.transport_id)?;
-            let selected_provider = selection.selected.metadata.id.clone();
+            let selected_transport = wire_transport(selection.selected_provider().transport_id)?;
+            let selected_provider = selection.selected_provider().metadata.id.clone();
             match session.close().await {
                 Ok(()) | Err(RuntimeError::Io(_)) | Err(RuntimeError::TransportClosed { .. }) => {}
                 Err(error) => return Err(error.into()),
@@ -259,12 +259,12 @@ async fn run_server_case(
     } else {
         TransportPolicy::Auto
     };
-    let options = NnrpServerOptions {
-        endpoint: fixture.application_endpoint.parse()?,
-        provider_routes: routes,
-        transport_policy: policy,
-        session: NnrpServerConfig::default(),
-    };
+    let options = NnrpServerOptions::new(
+        fixture.application_endpoint.parse()?,
+        routes,
+        policy,
+        NnrpServerConfig::default(),
+    );
 
     match NnrpServer::listen(options, providers).await {
         Ok(server) if terminal_failure.is_some() => {
@@ -518,12 +518,9 @@ fn candidate_evidence(
 fn selection_error_candidates(
     error: &TransportSelectionError,
 ) -> Result<&[TransportCandidateDiagnostic]> {
-    #[allow(unreachable_patterns)]
-    match error {
-        TransportSelectionError::ForcedTransportUnavailable { candidates, .. }
-        | TransportSelectionError::NoViableTransport { candidates } => Ok(candidates),
-        _ => Err(non_candidate_selection_error(error)),
-    }
+    error
+        .candidates()
+        .ok_or_else(|| non_candidate_selection_error(error))
 }
 
 fn non_candidate_selection_error(error: impl std::fmt::Display) -> anyhow::Error {
