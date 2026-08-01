@@ -202,7 +202,7 @@ async fn run_client_case(
             ))
         }
         Err(RuntimeError::TransportSelection(error)) => {
-            let diagnostics = selection_error_candidates(&error)?;
+            let diagnostics = selection_error_candidates(&error);
             Ok(passed_result(
                 scenario,
                 WireConformanceTerminal::Error,
@@ -515,16 +515,8 @@ fn candidate_evidence(
         .collect()
 }
 
-fn selection_error_candidates(
-    error: &TransportSelectionError,
-) -> Result<&[TransportCandidateDiagnostic]> {
-    error
-        .candidates()
-        .ok_or_else(|| non_candidate_selection_error(error))
-}
-
-fn non_candidate_selection_error(error: impl std::fmt::Display) -> anyhow::Error {
-    anyhow::anyhow!("host-route target rejected non-candidate selection error: {error}")
+fn selection_error_candidates(error: &TransportSelectionError) -> &[TransportCandidateDiagnostic] {
+    error.candidates()
 }
 
 fn validate_provider_routes(routes: &[WireHostProviderRoute]) -> Result<()> {
@@ -930,7 +922,7 @@ impl FramedListener for TerminalFailureListener {
 
 #[cfg(test)]
 mod tests {
-    use super::{SupportedHostRoles, non_candidate_selection_error, rollback_probe_policy};
+    use super::{SupportedHostRoles, rollback_probe_policy};
     use nnrp_conformance_fixtures::{
         WireConformanceTransport, WireHostCredentialOwner, WireHostProviderRoute, WireHostRole,
         WireHostRouteInjectedFailure, WireHostRouteSecurity, WireHostRouteSecurityMode,
@@ -969,15 +961,6 @@ mod tests {
         assert!(!client.supports(WireHostRole::Server));
         assert!(server.supports(WireHostRole::Server));
         assert!(!server.supports(WireHostRole::Client));
-    }
-
-    #[test]
-    fn non_candidate_selection_error_preserves_the_message_contract() {
-        let message = non_candidate_selection_error("provider identity mismatch").to_string();
-        assert_eq!(
-            message,
-            "host-route target rejected non-candidate selection error: provider identity mismatch"
-        );
     }
 
     fn roles(client: bool, server: bool) -> SupportedHostRoles {
