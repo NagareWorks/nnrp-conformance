@@ -516,7 +516,29 @@ fn candidate_evidence(
 }
 
 fn selection_error_candidates(error: &TransportSelectionError) -> &[TransportCandidateDiagnostic] {
-    error.candidates()
+    required_candidate_evidence(error.candidates())
+}
+
+trait CandidateEvidence<'a> {
+    fn required(self) -> &'a [TransportCandidateDiagnostic];
+}
+
+impl<'a> CandidateEvidence<'a> for &'a [TransportCandidateDiagnostic] {
+    fn required(self) -> &'a [TransportCandidateDiagnostic] {
+        self
+    }
+}
+
+impl<'a> CandidateEvidence<'a> for Option<&'a [TransportCandidateDiagnostic]> {
+    fn required(self) -> &'a [TransportCandidateDiagnostic] {
+        self.unwrap_or_default()
+    }
+}
+
+fn required_candidate_evidence<'a>(
+    evidence: impl CandidateEvidence<'a>,
+) -> &'a [TransportCandidateDiagnostic] {
+    evidence.required()
 }
 
 fn validate_provider_routes(routes: &[WireHostProviderRoute]) -> Result<()> {
@@ -922,7 +944,7 @@ impl FramedListener for TerminalFailureListener {
 
 #[cfg(test)]
 mod tests {
-    use super::{SupportedHostRoles, rollback_probe_policy};
+    use super::{SupportedHostRoles, required_candidate_evidence, rollback_probe_policy};
     use nnrp_conformance_fixtures::{
         WireConformanceTransport, WireHostCredentialOwner, WireHostProviderRoute, WireHostRole,
         WireHostRouteInjectedFailure, WireHostRouteSecurity, WireHostRouteSecurityMode,
@@ -961,6 +983,14 @@ mod tests {
         assert!(!client.supports(WireHostRole::Server));
         assert!(server.supports(WireHostRole::Server));
         assert!(!server.supports(WireHostRole::Client));
+    }
+
+    #[test]
+    fn candidate_evidence_normalizes_required_and_optional_accessors() {
+        let evidence = Vec::new();
+        assert!(required_candidate_evidence(evidence.as_slice()).is_empty());
+        assert!(required_candidate_evidence(Some(evidence.as_slice())).is_empty());
+        assert!(required_candidate_evidence(None).is_empty());
     }
 
     fn roles(client: bool, server: bool) -> SupportedHostRoles {
