@@ -202,7 +202,7 @@ async fn run_client_case(
             ))
         }
         Err(RuntimeError::TransportSelection(error)) => {
-            let diagnostics = selection_error_candidates(&error);
+            let diagnostics = selection_error_candidates(&error)?;
             Ok(passed_result(
                 scenario,
                 WireConformanceTerminal::Error,
@@ -515,29 +515,31 @@ fn candidate_evidence(
         .collect()
 }
 
-fn selection_error_candidates(error: &TransportSelectionError) -> &[TransportCandidateDiagnostic] {
+fn selection_error_candidates(
+    error: &TransportSelectionError,
+) -> Result<&[TransportCandidateDiagnostic]> {
     required_candidate_evidence(error.candidates())
 }
 
 trait CandidateEvidence<'a> {
-    fn required(self) -> &'a [TransportCandidateDiagnostic];
+    fn required(self) -> Result<&'a [TransportCandidateDiagnostic]>;
 }
 
 impl<'a> CandidateEvidence<'a> for &'a [TransportCandidateDiagnostic] {
-    fn required(self) -> &'a [TransportCandidateDiagnostic] {
-        self
+    fn required(self) -> Result<&'a [TransportCandidateDiagnostic]> {
+        Ok(self)
     }
 }
 
 impl<'a> CandidateEvidence<'a> for Option<&'a [TransportCandidateDiagnostic]> {
-    fn required(self) -> &'a [TransportCandidateDiagnostic] {
-        self.unwrap_or_default()
+    fn required(self) -> Result<&'a [TransportCandidateDiagnostic]> {
+        self.context("transport selection error omitted candidate diagnostics")
     }
 }
 
 fn required_candidate_evidence<'a>(
     evidence: impl CandidateEvidence<'a>,
-) -> &'a [TransportCandidateDiagnostic] {
+) -> Result<&'a [TransportCandidateDiagnostic]> {
     evidence.required()
 }
 
@@ -986,11 +988,24 @@ mod tests {
     }
 
     #[test]
-    fn candidate_evidence_normalizes_required_and_optional_accessors() {
+    fn candidate_evidence_accepts_both_accessor_shapes_and_rejects_missing_data() {
         let evidence = Vec::new();
-        assert!(required_candidate_evidence(evidence.as_slice()).is_empty());
-        assert!(required_candidate_evidence(Some(evidence.as_slice())).is_empty());
-        assert!(required_candidate_evidence(None).is_empty());
+        assert!(
+            required_candidate_evidence(evidence.as_slice())
+                .expect("required candidate evidence")
+                .is_empty()
+        );
+        assert!(
+            required_candidate_evidence(Some(evidence.as_slice()))
+                .expect("optional candidate evidence")
+                .is_empty()
+        );
+        assert_eq!(
+            required_candidate_evidence(None)
+                .expect_err("missing candidate evidence must fail")
+                .to_string(),
+            "transport selection error omitted candidate diagnostics"
+        );
     }
 
     fn roles(client: bool, server: bool) -> SupportedHostRoles {
