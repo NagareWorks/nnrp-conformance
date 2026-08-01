@@ -1031,7 +1031,13 @@ mod tests {
                 .expect("preview4 example capability manifest should load");
 
         assert_eq!(protocol_manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(protocol_manifest.case_manifests.len(), 6);
+        assert_eq!(protocol_manifest.case_manifests.len(), 7);
+        assert!(
+            protocol_manifest
+                .case_manifests
+                .iter()
+                .any(|path| path == "cases/nnrp1-baseline-core.json")
+        );
         assert!(
             protocol_manifest
                 .case_manifests

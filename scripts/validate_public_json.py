@@ -101,6 +101,61 @@ def validate_capability_tokens(
         )
 
 
+def validate_protocol_composition(
+    protocol_root: Path,
+    protocol_manifest: dict[str, object],
+) -> None:
+    protocol_version = protocol_manifest.get("protocol_version")
+    if not isinstance(protocol_version, str) or not protocol_version:
+        raise SystemExit("protocol manifest protocol_version must be a non-empty string")
+
+    case_owners: dict[str, Path] = {}
+    for relative_path in protocol_manifest.get("case_manifests", []):
+        case_path = protocol_root / str(relative_path)
+        case_manifest = load_json(case_path)
+        if not isinstance(case_manifest, dict):
+            raise SystemExit(f"case manifest must be a JSON object: {case_path}")
+        if case_manifest.get("protocol_version") != protocol_version:
+            raise SystemExit(
+                f"case manifest protocol_version mismatch: {case_path} declares "
+                f"{case_manifest.get('protocol_version')!r}, expected {protocol_version!r}"
+            )
+        for case in case_manifest.get("cases", []):
+            if not isinstance(case, dict) or not isinstance(case.get("id"), str):
+                continue
+            case_id = case["id"]
+            previous = case_owners.get(case_id)
+            if previous is not None:
+                raise SystemExit(
+                    f"duplicate case id {case_id!r} in {previous} and {case_path}"
+                )
+            case_owners[case_id] = case_path
+
+    vector_owners: dict[str, Path] = {}
+    for relative_path in protocol_manifest.get("vector_recipe_manifests", []):
+        if not relative_path:
+            continue
+        vector_path = protocol_root / str(relative_path)
+        vector_manifest = load_json(vector_path)
+        if not isinstance(vector_manifest, dict):
+            raise SystemExit(f"vector recipe manifest must be a JSON object: {vector_path}")
+        if vector_manifest.get("protocol_version") != protocol_version:
+            raise SystemExit(
+                f"vector recipe protocol_version mismatch: {vector_path} declares "
+                f"{vector_manifest.get('protocol_version')!r}, expected {protocol_version!r}"
+            )
+        for vector in vector_manifest.get("vectors", []):
+            if not isinstance(vector, dict) or not isinstance(vector.get("name"), str):
+                continue
+            name = vector["name"]
+            previous = vector_owners.get(name)
+            if previous is not None:
+                raise SystemExit(
+                    f"duplicate semantic vector name {name!r} in {previous} and {vector_path}"
+                )
+            vector_owners[name] = vector_path
+
+
 def find_repo_root(start: Path) -> Path:
     for candidate in (start, *start.parents):
         if (candidate / "schemas" / "protocol-manifest.schema.json").exists():
@@ -119,6 +174,8 @@ def validate_protocol_baseline(protocol_manifest_path: Path) -> None:
     protocol_manifest = load_json(protocol_manifest_path)
     if not isinstance(protocol_manifest, dict):
         raise SystemExit(f"protocol manifest must be a JSON object: {protocol_manifest_path}")
+
+    validate_protocol_composition(protocol_root, protocol_manifest)
 
     for relative_path in protocol_manifest.get("case_manifests", []):
         validate_json(schema_root / "case-manifest.schema.json", protocol_root / relative_path, registry)
