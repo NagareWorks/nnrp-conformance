@@ -5,6 +5,7 @@
   "status": "frozen",
   "case_manifests": [
     "cases/common-header-core.json",
+    "cases/nnrp1-baseline-core.json",
     "cases/typed-payload-core.json",
     "cases/runtime-control-core.json",
     "cases/runtime-object-core.json",
@@ -12,6 +13,7 @@
     "cases/runtime-control-experimental.json"
   ],
   "vector_recipe_manifests": [
+    "vectors/nnrp1-baseline-semantic-vectors.json",
     "vectors/semantic-vectors.json"
   ],
   "vector_manifests": [],
