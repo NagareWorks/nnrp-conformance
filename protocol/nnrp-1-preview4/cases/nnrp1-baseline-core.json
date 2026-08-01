@@ -1,0 +1,175 @@
+{
+  "$schema": "../../../schemas/case-manifest.schema.json",
+  "protocol_version": "nnrp-1-preview4",
+  "manifest_name": "nnrp1-baseline-core",
+  "cases": [
+    {
+      "id": "l0.control.client_hello.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "handshake.basic",
+      "required_capabilities": ["handshake.basic"],
+      "description": "Round-trip the canonical CLIENT_HELLO metadata used by the current NNRP/1 handshake."
+    },
+    {
+      "id": "l0.control.session_patch_ack.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "session.resume",
+      "required_capabilities": ["session.resume", "session.open_close"],
+      "description": "Round-trip the canonical SESSION_PATCH_ACK metadata without changing session recovery semantics."
+    },
+    {
+      "id": "l0.flow_update.packet.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "flow_update",
+      "required_capabilities": ["flow_update"],
+      "description": "Round-trip the canonical FLOW_UPDATE packet and preserve scoped credit and retry metadata."
+    },
+    {
+      "id": "l0.result_hint.packet.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "flow_update",
+      "required_capabilities": ["flow_update"],
+      "description": "Round-trip the canonical RESULT_HINT packet and preserve its budget and congestion fields."
+    },
+    {
+      "id": "l0.frame_submit.metadata.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "frame_submit.tensor.inline",
+      "required_capabilities": ["frame_submit.tensor.inline"],
+      "description": "Round-trip the canonical FRAME_SUBMIT metadata used by the current NNRP/1 submit path."
+    },
+    {
+      "id": "l0.result_push.metadata.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "result_push.basic",
+      "required_capabilities": ["result_push.basic"],
+      "description": "Round-trip the canonical RESULT_PUSH metadata, including status, result class, flags, and payload bookkeeping."
+    },
+    {
+      "id": "l0.body_region.prelude.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "payload.typed",
+      "required_capabilities": ["payload.typed"],
+      "description": "Round-trip the canonical typed-payload body-region prelude."
+    },
+    {
+      "id": "l0.object_reference.block.golden",
+      "layer": "L0",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": ["cache.lifecycle"],
+      "description": "Round-trip the canonical cache-backed object-reference block."
+    },
+    {
+      "id": "l0.typed_payload.descriptor.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "payload.typed",
+      "required_capabilities": ["payload.typed"],
+      "description": "Round-trip the inherited NNRP/1 typed-payload descriptor shape."
+    },
+    {
+      "id": "l0.typed_payload.frame_regions.golden",
+      "layer": "L0",
+      "status": "mandatory",
+      "feature": "payload.typed",
+      "required_capabilities": ["payload.typed"],
+      "description": "Round-trip typed-payload frame regions across token, audio, video, and structured-event payload kinds."
+    },
+    {
+      "id": "l1.flow_update.metadata.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "flow_update",
+      "required_capabilities": ["flow_update"],
+      "description": "Validate FLOW_UPDATE routing, credit, retry-after, and flag semantics."
+    },
+    {
+      "id": "l1.result_hint.metadata.validation",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "flow_update",
+      "required_capabilities": ["flow_update"],
+      "description": "Validate RESULT_HINT metadata and reject unknown reason codes."
+    },
+    {
+      "id": "l1.cache.lifecycle.roundtrip",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": ["cache.lifecycle"],
+      "description": "Round-trip CACHE_PUT, CACHE_ACK, and CACHE_INVALIDATE metadata as one public cache lifecycle."
+    },
+    {
+      "id": "l1.transport_probe.metadata.roundtrip",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "transport.probe",
+      "required_capabilities": ["transport.tcp", "transport.quic"],
+      "description": "Round-trip TRANSPORT_PROBE and TRANSPORT_PROBE_ACK metadata."
+    },
+    {
+      "id": "l1.frame_submit.message.parse_emit",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "frame_submit.tensor.inline",
+      "required_capabilities": ["frame_submit.tensor.inline", "payload.typed"],
+      "description": "Parse and emit FRAME_SUBMIT with typed payload and object-reference bookkeeping intact."
+    },
+    {
+      "id": "l1.result_push.message.parse_emit",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "result_push.basic",
+      "required_capabilities": ["result_push.basic"],
+      "description": "Parse and emit RESULT_PUSH while preserving status, result class, flags, and typed-payload metadata."
+    },
+    {
+      "id": "l1.result_push.object_reference.resolve",
+      "layer": "L1",
+      "status": "optional",
+      "feature": "cache.lifecycle",
+      "required_capabilities": ["result_push.basic", "cache.lifecycle"],
+      "description": "Resolve RESULT_PUSH object references or surface a protocol-shaped cache miss."
+    },
+    {
+      "id": "l1.typed_payload.region.pack",
+      "layer": "L1",
+      "status": "mandatory",
+      "feature": "payload.typed",
+      "required_capabilities": ["payload.typed"],
+      "description": "Pack typed-payload descriptors and frame regions without rebasing offsets."
+    },
+    {
+      "id": "l3.transport.probe.selection",
+      "layer": "L3",
+      "status": "optional",
+      "feature": "transport.probe",
+      "required_capabilities": ["transport.tcp", "transport.quic"],
+      "description": "Select the ready transport from real probe observations and preserve deterministic fallback."
+    },
+    {
+      "id": "l3.transport.tcp.session_smoke",
+      "layer": "L3",
+      "status": "optional",
+      "feature": "transport.tcp",
+      "required_capabilities": ["transport.tcp", "session.open_close"],
+      "description": "Run a real TCP session smoke test through the current NNRP/1 runtime."
+    },
+    {
+      "id": "l3.transport.quic.session_smoke",
+      "layer": "L3",
+      "status": "optional",
+      "feature": "transport.quic",
+      "required_capabilities": ["transport.quic", "session.open_close"],
+      "description": "Run a real QUIC session smoke test through the current NNRP/1 runtime."
+    }
+  ]
+}
