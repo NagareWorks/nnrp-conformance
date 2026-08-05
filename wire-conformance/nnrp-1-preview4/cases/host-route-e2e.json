@@ -248,6 +248,32 @@
       }
     },
     {
+      "id": "wire.host-route.native.websocket-wss-client",
+      "mode": "suite_as_server",
+      "host_route": {
+        "role": "client",
+        "platform": "native",
+        "application_endpoint": "nnrps://host-route.test",
+        "routes": [
+          {
+            "transport": "websocket",
+            "provider_id": "nnrp.transport.websocket.native",
+            "locator": "suite://allocate/websocket/native-wss-client",
+            "security": {"mode": "wss", "credential_owner": "suite"}
+          }
+        ]
+      },
+      "status": "mandatory",
+      "feature": "host.routes",
+      "required_capabilities": ["host.routes"],
+      "description": "A native client keeps suite-owned WSS trust on its route-local WebSocket carrier while the application endpoint remains nnrps.",
+      "steps": [{"action": "connect_routes", "timeout_ms": 3000}],
+      "expect": {
+        "terminal": "success",
+        "route": {"selected_count": 1, "selected_transport": "websocket"}
+      }
+    },
+    {
       "id": "wire.host-route.browser.wss",
       "mode": "suite_as_server",
       "host_route": {

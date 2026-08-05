@@ -164,7 +164,7 @@ against that manifest. The two binaries share only the public wire protocol and 
 the runner does not call a target adapter or target implementation function.
 
 CI also launches `nnrp-wire-host-route-reference-target` once per selected host-route scenario. The
-native installed-provider profile and the isolated uninstalled-QUIC profile together exercise ten
+native installed-provider profile and the isolated uninstalled-QUIC profile together exercise eleven
 route scenarios through the Rust SDK host APIs. Keeping those profiles separate preserves the
 one-provider-per-transport registry contract. Neither profile claims the browser WebSocket provider
 identity, so neither can impersonate or accidentally satisfy the browser WSS case; that case is
@@ -224,11 +224,11 @@ remains invalid/unset under the scheduling metadata contract.
 
 ## Current implementation boundary
 
-The current runner has typed executors for all six frame-level preview4 scenarios and all eleven
-host-route scenarios. Repository CI selects the six frame scenarios and ten native host-route
-scenarios across the nine installed-provider cases and the uninstalled-QUIC target profile, drives
+The current runner has typed executors for all six frame-level preview4 scenarios and all twelve
+host-route scenarios. Repository CI selects the six frame scenarios and eleven native host-route
+scenarios across the ten installed-provider cases and the uninstalled-QUIC target profile, drives
 independent target processes over TCP, QUIC, IPC, and secure WebSocket endpoints, and validates both generated result
-reports with zero skipped cases. It also runs the nine installed native host-route scenarios
+reports with zero skipped cases. It also runs the ten installed native host-route scenarios
 against client-only and server-only targets and requires the unsupported half to fail. The browser
 WSS scenario remains part of the mandatory suite and is selected when a target declares the browser
 provider identity.

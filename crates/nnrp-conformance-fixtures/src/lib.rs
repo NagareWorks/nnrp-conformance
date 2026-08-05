@@ -898,9 +898,10 @@ mod tests {
         CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest,
         WireConformanceCaseResultReport, WireConformanceExecutionPlan,
         WireConformanceScenarioManifest, WireConformanceSuiteManifest,
-        WireConformanceTargetManifest, WireConformanceTransport, WireHostPlatform,
-        WireHostRouteReadyReport, WireHostRouteRejectionReason, build_vector_manifest,
-        load_json_file, validate_protocol_alignment, verify_vector_manifest,
+        WireConformanceTargetManifest, WireConformanceTransport, WireHostCredentialOwner,
+        WireHostPlatform, WireHostRouteReadyReport, WireHostRouteRejectionReason,
+        WireHostRouteSecurityMode, build_vector_manifest, load_json_file,
+        validate_protocol_alignment, verify_vector_manifest,
     };
     use std::path::PathBuf;
 
@@ -1444,7 +1445,7 @@ mod tests {
             all_scenarios.extend(scenarios.scenarios);
         }
 
-        assert_eq!(all_scenarios.len(), 17);
+        assert_eq!(all_scenarios.len(), 18);
         assert!(
             all_scenarios
                 .iter()
@@ -1471,7 +1472,7 @@ mod tests {
             .iter()
             .filter(|scenario| scenario.feature == "host.routes")
             .collect::<Vec<_>>();
-        assert_eq!(host_route_scenarios.len(), 11);
+        assert_eq!(host_route_scenarios.len(), 12);
         assert!(host_route_scenarios.iter().all(|scenario| {
             scenario.status == CaseStatus::Mandatory && scenario.host_route.is_some()
         }));
@@ -1497,6 +1498,18 @@ mod tests {
                         && fixture.routes.iter().any(|route| {
                             route.transport == WireConformanceTransport::Websocket
                                 && route.provider_id == "nnrp.transport.websocket.native"
+                        })
+                })
+        }));
+        assert!(host_route_scenarios.iter().any(|scenario| {
+            scenario.id == "wire.host-route.native.websocket-wss-client"
+                && scenario.host_route.as_ref().is_some_and(|fixture| {
+                    fixture.platform == WireHostPlatform::Native
+                        && fixture.routes.iter().any(|route| {
+                            route.transport == WireConformanceTransport::Websocket
+                                && route.provider_id == "nnrp.transport.websocket.native"
+                                && route.security.mode == WireHostRouteSecurityMode::Wss
+                                && route.security.credential_owner == WireHostCredentialOwner::Suite
                         })
                 })
         }));
