@@ -17,6 +17,10 @@ NNRP frames directly.
 - [x] Add CI coverage for wire plan generation and result validation against an independent target process.
 - [x] Implement the runner that drives declared TCP, QUIC, IPC, and WebSocket target endpoints directly.
 - [x] Add timeout, close, backpressure, and frame-order injection evidence in proxy mode.
+- [x] Enforce frame-result matching instead of treating observed frame reports as unordered bags.
+  - [x] Match required frames as an ordered subsequence while allowing legal streaming repetition.
+  - [x] Reject every observed frame outside the scenario's exhaustive `allowed_frames` set.
+  - [x] Reject missing or reordered required frames with scenario-local diagnostics.
 - [x] Add CI examples that launch the reference target as a separate process and exercise all selected roles over live endpoints.
 - [x] Validate that cache-reference scenarios preserve `cache_namespace`, `cache_key_hi`, and
       `cache_key_lo` without collapsing the 128-bit key into a text alias.

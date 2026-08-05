@@ -144,6 +144,11 @@ connection and teardown allowance so process startup is not confused with protoc
 `wire-run` writes the complete report before returning a nonzero process status when any selected
 scenario fails.
 
+For frame-level scenarios, `expect.frames` is the ordered required subsequence and
+`expect.allowed_frames` is the exhaustive set of frame names permitted in the report. Legal
+streaming repetitions remain valid, but an undeclared frame or a required frame observed out of
+order fails validation. Host-route scenarios use route evidence and omit both frame lists.
+
 ```bash
 cargo run -p nnrp-conformance-runner -- \
   validate-wire-results \

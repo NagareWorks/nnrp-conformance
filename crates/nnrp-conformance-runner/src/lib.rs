@@ -426,6 +426,36 @@ fn validate_wire_scenario_shape(scenario: &WireConformanceScenario) -> Result<()
             ),
         });
     }
+    if scenario.transport.is_some() {
+        if scenario.expect.frames.is_empty() || scenario.expect.allowed_frames.is_empty() {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire frame scenario {} must declare ordered frames and allowed_frames",
+                    scenario.id
+                ),
+            });
+        }
+        if let Some(frame) = scenario
+            .expect
+            .frames
+            .iter()
+            .find(|frame| !scenario.expect.allowed_frames.contains(frame))
+        {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} requires frame {} outside allowed_frames",
+                    scenario.id, frame
+                ),
+            });
+        }
+    } else if !scenario.expect.frames.is_empty() || !scenario.expect.allowed_frames.is_empty() {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire host-route scenario {} must use route evidence instead of frame expectations",
+                scenario.id
+            ),
+        });
+    }
     if let Some(fixture) = &scenario.host_route {
         let expected_mode = match fixture.role {
             WireHostRole::Client => nnrp_conformance_fixtures::WireConformanceMode::SuiteAsServer,
@@ -744,19 +774,37 @@ pub fn validate_wire_conformance_results(
                         ),
                     });
                 }
-                for expected_frame in &expected_scenario.expect.frames {
-                    if !result
-                        .observed_frames
+                if let Some(unexpected_frame) = result.observed_frames.iter().find(|frame| {
+                    !expected_scenario
+                        .expect
+                        .allowed_frames
+                        .contains(&frame.frame)
+                }) {
+                    return Err(FixtureError::Validation {
+                        message: format!(
+                            "wire scenario {} observed unexpected frame {}",
+                            result.id, unexpected_frame.frame
+                        ),
+                    });
+                }
+                let mut observed_cursor = 0;
+                for (required_index, expected_frame) in
+                    expected_scenario.expect.frames.iter().enumerate()
+                {
+                    let Some(relative_index) = result.observed_frames[observed_cursor..]
                         .iter()
-                        .any(|frame| &frame.frame == expected_frame)
-                    {
+                        .position(|frame| &frame.frame == expected_frame)
+                    else {
                         return Err(FixtureError::Validation {
                             message: format!(
-                                "wire scenario {} missing expected frame {}",
-                                result.id, expected_frame
+                                "wire scenario {} missing or reordered expected frame {} at required position {}",
+                                result.id,
+                                expected_frame,
+                                required_index + 1
                             ),
                         });
-                    }
+                    };
+                    observed_cursor += relative_index + 1;
                 }
                 validate_wire_route_evidence(expected_plan, expected_scenario, result)?;
                 summary.passed_scenarios += 1;
@@ -3062,8 +3110,18 @@ mod tests {
             expect: WireConformanceExpectation {
                 terminal: WireConformanceTerminal::Cancelled,
                 frames: vec!["CANCEL_ACK".to_string()],
+                allowed_frames: vec!["CANCEL_ACK".to_string()],
                 route: None,
             },
+        }
+    }
+
+    fn observed_wire_frame(frame: &str, timestamp_us: u64) -> WireConformanceObservedFrame {
+        WireConformanceObservedFrame {
+            direction: WireConformanceFrameDirection::Received,
+            frame: frame.to_string(),
+            payload: None,
+            timestamp_us: Some(timestamp_us),
         }
     }
 
@@ -3141,6 +3199,7 @@ mod tests {
             expect: WireConformanceExpectation {
                 terminal: WireConformanceTerminal::Success,
                 frames: vec![],
+                allowed_frames: vec![],
                 route: Some(WireHostRouteExpectation {
                     selected_count: Some(1),
                     selected_transport: None,
@@ -3909,6 +3968,149 @@ mod tests {
         .expect_err("wire results should reject missing expected frame");
 
         assert!(error.to_string().contains("CANCEL_ACK"));
+    }
+
+    #[test]
+    fn wire_results_accept_allowed_repetition_with_required_order_intact() {
+        let mut scenario = sample_wire_scenario(
+            "selected",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        );
+        scenario.expect.frames = vec!["TRACE_CONTEXT".to_string(), "RESULT_PUSH".to_string()];
+        scenario.expect.allowed_frames = vec![
+            "REQUEST".to_string(),
+            "TRACE_CONTEXT".to_string(),
+            "RESULT_PUSH".to_string(),
+        ];
+        let plan = build_wire_conformance_execution_plan(
+            &sample_wire_target(),
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("wire execution plan should build");
+
+        validate_wire_conformance_results(
+            &plan,
+            &WireConformanceCaseResultReport {
+                schema: None,
+                protocol_version: "nnrp-1-preview4".to_string(),
+                suite_version: "0.1.0".to_string(),
+                target_name: "sample-target".to_string(),
+                results: vec![WireConformanceCaseResult {
+                    id: "selected".to_string(),
+                    outcome: ApiProfileCaseOutcome::Passed,
+                    terminal: WireConformanceTerminal::Cancelled,
+                    observed_frames: vec![
+                        observed_wire_frame("REQUEST", 10),
+                        observed_wire_frame("TRACE_CONTEXT", 20),
+                        observed_wire_frame("TRACE_CONTEXT", 30),
+                        observed_wire_frame("RESULT_PUSH", 40),
+                    ],
+                    route_evidence: None,
+                    message: None,
+                    evidence_paths: vec![],
+                }],
+            },
+        )
+        .expect("allowed extra and repeated frames should preserve ordered matching");
+    }
+
+    #[test]
+    fn wire_results_reject_unexpected_frame() {
+        let plan = build_wire_conformance_execution_plan(
+            &sample_wire_target(),
+            &[sample_wire_scenario(
+                "selected",
+                WireConformanceMode::SuiteAsClient,
+                WireConformanceTransport::Tcp,
+                vec!["control.cancel_abort"],
+            )],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("wire execution plan should build");
+
+        let error = validate_wire_conformance_results(
+            &plan,
+            &WireConformanceCaseResultReport {
+                schema: None,
+                protocol_version: "nnrp-1-preview4".to_string(),
+                suite_version: "0.1.0".to_string(),
+                target_name: "sample-target".to_string(),
+                results: vec![WireConformanceCaseResult {
+                    id: "selected".to_string(),
+                    outcome: ApiProfileCaseOutcome::Passed,
+                    terminal: WireConformanceTerminal::Cancelled,
+                    observed_frames: vec![
+                        observed_wire_frame("REQUEST", 10),
+                        observed_wire_frame("CANCEL_ACK", 20),
+                    ],
+                    route_evidence: None,
+                    message: None,
+                    evidence_paths: vec![],
+                }],
+            },
+        )
+        .expect_err("wire results should reject an undeclared frame");
+
+        assert!(error.to_string().contains("unexpected frame REQUEST"));
+    }
+
+    #[test]
+    fn wire_results_reject_reordered_required_frames() {
+        let mut scenario = sample_wire_scenario(
+            "selected",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        );
+        scenario.expect.frames = vec!["TRACE_CONTEXT".to_string(), "RESULT_PUSH".to_string()];
+        scenario.expect.allowed_frames = scenario.expect.frames.clone();
+        let plan = build_wire_conformance_execution_plan(
+            &sample_wire_target(),
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("wire execution plan should build");
+
+        let error = validate_wire_conformance_results(
+            &plan,
+            &WireConformanceCaseResultReport {
+                schema: None,
+                protocol_version: "nnrp-1-preview4".to_string(),
+                suite_version: "0.1.0".to_string(),
+                target_name: "sample-target".to_string(),
+                results: vec![WireConformanceCaseResult {
+                    id: "selected".to_string(),
+                    outcome: ApiProfileCaseOutcome::Passed,
+                    terminal: WireConformanceTerminal::Cancelled,
+                    observed_frames: vec![
+                        observed_wire_frame("RESULT_PUSH", 10),
+                        observed_wire_frame("TRACE_CONTEXT", 20),
+                    ],
+                    route_evidence: None,
+                    message: None,
+                    evidence_paths: vec![],
+                }],
+            },
+        )
+        .expect_err("wire results should reject reordered required frames");
+
+        assert!(
+            error
+                .to_string()
+                .contains("missing or reordered expected frame RESULT_PUSH")
+        );
     }
 
     #[test]

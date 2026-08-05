@@ -301,6 +301,16 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "allowed_frames": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
                 "uniqueItems": true
               },
               "route": {"$ref": "#/$defs/hostRouteExpectation"}
@@ -316,10 +326,25 @@
           {
             "if": {"required": ["host_route"]},
             "then": {
-              "properties": {"expect": {"required": ["route"]}}
+              "properties": {
+                "expect": {
+                  "required": ["route"],
+                  "not": {
+                    "anyOf": [
+                      {"required": ["frames"]},
+                      {"required": ["allowed_frames"]}
+                    ]
+                  }
+                }
+              }
             },
             "else": {
-              "properties": {"expect": {"not": {"required": ["route"]}}}
+              "properties": {
+                "expect": {
+                  "required": ["frames", "allowed_frames"],
+                  "not": {"required": ["route"]}
+                }
+              }
             }
           }
         ],

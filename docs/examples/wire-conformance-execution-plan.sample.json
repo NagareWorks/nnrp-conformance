@@ -63,6 +63,12 @@
         "frames": [
           "TRACE_CONTEXT",
           "RESULT_DROP_REASON"
+        ],
+        "allowed_frames": [
+          "REQUEST",
+          "CANCEL",
+          "TRACE_CONTEXT",
+          "RESULT_DROP_REASON"
         ]
       }
     },

@@ -604,6 +604,8 @@ pub struct WireConformanceExpectation {
     pub terminal: WireConformanceTerminal,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub frames: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_frames: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub route: Option<WireHostRouteExpectation>,
 }
@@ -1358,6 +1360,10 @@ mod tests {
                 .all(|provider| provider.installed)
         );
         assert_eq!(plan.scenarios[0].required_capabilities.len(), 3);
+        assert_eq!(
+            plan.scenarios[0].expect.allowed_frames,
+            ["REQUEST", "CANCEL", "TRACE_CONTEXT", "RESULT_DROP_REASON"]
+        );
         let host_route = plan.scenarios[1]
             .host_route
             .as_ref()
