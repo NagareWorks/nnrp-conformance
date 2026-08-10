@@ -331,8 +331,12 @@ async fn cancel_target(server: &NnrpServer) -> Result<()> {
             canonical_trace_body().to_vec(),
         )
         .await?;
-    session
-        .send_result_drop_reason(cancel_drop_reason(submit.operation_id))
+    submit
+        .send_result_drop(
+            &mut session,
+            cancel_drop_reason(submit.operation_id),
+            Vec::new(),
+        )
         .await?;
     close_server_session(&mut session).await
 }
@@ -348,8 +352,12 @@ async fn priority_target(server: &NnrpServer) -> Result<()> {
             event => bail!("priority target expected {expected:?}, got {event:?}"),
         }
     }
-    session
-        .send_result_drop_reason(cancel_drop_reason(submit.operation_id))
+    submit
+        .send_result_drop(
+            &mut session,
+            cancel_drop_reason(submit.operation_id),
+            Vec::new(),
+        )
         .await?;
     close_server_session(&mut session).await
 }
@@ -378,9 +386,9 @@ async fn cache_target(server: &NnrpServer) -> Result<()> {
     session
         .send_cache_miss(canonical_cache_miss(), Vec::new())
         .await?;
-    session
+    submit
         .send_result(
-            submit.frame_id,
+            &mut session,
             canonical_result(),
             canonical_response_body().to_vec(),
         )
