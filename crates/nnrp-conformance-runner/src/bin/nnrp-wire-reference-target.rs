@@ -22,9 +22,9 @@ use nnrp_conformance_fixtures::{
 };
 use nnrp_core::{MessageType, OperationState};
 use nnrp_runtime::{
-    NnrpRuntimeEventMetadata, NnrpRuntimeEventTail, NnrpServer, NnrpServerEvent, NnrpServerSession,
-    NnrpSubmitHeaderContext, NnrpSubmitIdentity, NnrpSubmitPolicy, NnrpSubmitRequest,
-    NnrpTokenChunk, NnrpTokenSubmitInput,
+    NnrpClientRoleEvent, NnrpRuntimeEvent, NnrpRuntimeEventMetadata, NnrpRuntimeEventTail,
+    NnrpServer, NnrpServerEvent, NnrpServerSession, NnrpSubmitHeaderContext, NnrpSubmitIdentity,
+    NnrpSubmitPolicy, NnrpSubmitRequest, NnrpTokenChunk, NnrpTokenSubmitInput,
 };
 use nnrp_transport_quic::QuicServerEndpointConfig;
 
@@ -396,13 +396,13 @@ async fn progress_target_with_retry(endpoint: WireReferenceEndpoint) -> Result<(
             Ok(client) => {
                 let mut session = client.open_session().await?;
                 session.submit_nowait(token_submit(301)?).await?;
-                match session.await_event().await? {
+                match expect_client_runtime_event(session.await_event().await?)? {
                     event
                         if event.header.message_type == MessageType::Progress
                             && matches!(event.metadata, NnrpRuntimeEventMetadata::Progress(_)) => {}
                     event => bail!("progress target expected PROGRESS, got {event:?}"),
                 }
-                match session.await_event().await? {
+                match expect_client_runtime_event(session.await_event().await?)? {
                     event
                         if event.header.message_type == MessageType::CreditUpdate
                             && matches!(
@@ -412,7 +412,7 @@ async fn progress_target_with_retry(endpoint: WireReferenceEndpoint) -> Result<(
                             ) => {}
                     event => bail!("progress target expected CREDIT_UPDATE, got {event:?}"),
                 }
-                match session.await_event().await? {
+                match expect_client_runtime_event(session.await_event().await?)? {
                     event
                         if event.header.message_type == MessageType::PartialResult
                             && matches!(
@@ -421,7 +421,7 @@ async fn progress_target_with_retry(endpoint: WireReferenceEndpoint) -> Result<(
                             ) => {}
                     event => bail!("progress target expected PARTIAL_RESULT, got {event:?}"),
                 }
-                match session.await_event().await? {
+                match expect_client_runtime_event(session.await_event().await?)? {
                     event
                         if event.header.message_type == MessageType::ResultPush
                             && matches!(
@@ -448,6 +448,15 @@ async fn progress_target_with_retry(endpoint: WireReferenceEndpoint) -> Result<(
     let error = last_error
         .context("progress target did not observe the suite listener before retry timeout")?;
     Err(error.into())
+}
+
+fn expect_client_runtime_event(event: NnrpClientRoleEvent) -> Result<NnrpRuntimeEvent> {
+    match event {
+        NnrpClientRoleEvent::Runtime(event) => Ok(event),
+        NnrpClientRoleEvent::Lifecycle(event) => {
+            bail!("wire reference target expected a runtime wire event, got lifecycle {event:?}")
+        }
+    }
 }
 
 async fn close_server_session(session: &mut NnrpServerSession) -> Result<()> {
