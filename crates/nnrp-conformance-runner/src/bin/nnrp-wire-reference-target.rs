@@ -20,7 +20,7 @@ use nnrp_conformance_fixtures::{
     WireConformanceTransportSecurity, WireHostPlatform, WireHostRouteProviderCapability,
     WireHostRouteSecurityMode,
 };
-use nnrp_core::MessageType;
+use nnrp_core::{MessageType, OperationState};
 use nnrp_runtime::{
     NnrpRuntimeEventMetadata, NnrpRuntimeEventTail, NnrpServer, NnrpServerEvent, NnrpServerSession,
     NnrpSubmitHeaderContext, NnrpSubmitIdentity, NnrpSubmitPolicy, NnrpSubmitRequest,
@@ -385,6 +385,7 @@ async fn cache_target(server: &NnrpServer) -> Result<()> {
             canonical_response_body().to_vec(),
         )
         .await?;
+    expect_completed_lifecycle(&mut session, submit.operation_id).await?;
     close_server_session(&mut session).await
 }
 
@@ -454,6 +455,20 @@ async fn close_server_session(session: &mut NnrpServerSession) -> Result<()> {
     session.ack_close(&close).await?;
     session.close_in_place().await?;
     Ok(())
+}
+
+async fn expect_completed_lifecycle(
+    session: &mut NnrpServerSession,
+    operation_id: u64,
+) -> Result<()> {
+    match session.await_event().await? {
+        NnrpServerEvent::Lifecycle(event)
+            if event.operation_id == operation_id && event.state == OperationState::Completed =>
+        {
+            Ok(())
+        }
+        event => bail!("target expected completed operation lifecycle, got {event:?}"),
+    }
 }
 
 fn token_submit(operation_id: u64) -> Result<NnrpSubmitRequest> {
