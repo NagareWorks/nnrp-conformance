@@ -22,7 +22,7 @@ use nnrp_conformance_fixtures::{
 };
 use nnrp_core::MessageType;
 use nnrp_runtime::{
-    NnrpRuntimeEventMetadata, NnrpRuntimeEventTail, NnrpServer, NnrpServerSession,
+    NnrpRuntimeEventMetadata, NnrpRuntimeEventTail, NnrpServer, NnrpServerEvent, NnrpServerSession,
     NnrpSubmitHeaderContext, NnrpSubmitIdentity, NnrpSubmitPolicy, NnrpSubmitRequest,
     NnrpTokenChunk, NnrpTokenSubmitInput,
 };
@@ -319,7 +319,7 @@ async fn cancel_target(server: &NnrpServer) -> Result<()> {
     let mut session = server.accept().await?;
     let submit = session.receive_submit().await?;
     match session.await_event().await? {
-        event
+        NnrpServerEvent::Runtime(event)
             if event.header.message_type == MessageType::Cancel
                 && matches!(event.metadata, NnrpRuntimeEventMetadata::ControlRequest(_)) => {}
         event => bail!("cancel target expected CANCEL, got {event:?}"),
@@ -342,7 +342,7 @@ async fn priority_target(server: &NnrpServer) -> Result<()> {
     let submit = session.receive_submit().await?;
     for expected in [MessageType::PriorityUpdate, MessageType::ExpireAt] {
         match session.await_event().await? {
-            event
+            NnrpServerEvent::Runtime(event)
                 if event.header.message_type == expected
                     && matches!(event.metadata, NnrpRuntimeEventMetadata::Scheduling(_)) => {}
             event => bail!("priority target expected {expected:?}, got {event:?}"),
@@ -358,19 +358,19 @@ async fn cache_target(server: &NnrpServer) -> Result<()> {
     let mut session = server.accept().await?;
     let submit = session.receive_submit().await?;
     match session.await_event().await? {
-        event
+        NnrpServerEvent::Runtime(event)
             if event.header.message_type == MessageType::CapabilityNegotiation
                 && matches!(event.metadata, NnrpRuntimeEventMetadata::Capability(_)) => {}
         event => bail!("cache target expected CAPABILITY_NEGOTIATION, got {event:?}"),
     }
     match session.await_event().await? {
-        event
+        NnrpServerEvent::Runtime(event)
             if event.header.message_type == MessageType::RouteHint
                 && matches!(event.metadata, NnrpRuntimeEventMetadata::RouteHint(_)) => {}
         event => bail!("cache target expected ROUTE_HINT, got {event:?}"),
     }
     match session.await_event().await? {
-        event
+        NnrpServerEvent::Runtime(event)
             if event.header.message_type == MessageType::CacheReference
                 && matches!(event.metadata, NnrpRuntimeEventMetadata::CacheReference(_)) => {}
         event => bail!("cache target expected CACHE_REFERENCE, got {event:?}"),
