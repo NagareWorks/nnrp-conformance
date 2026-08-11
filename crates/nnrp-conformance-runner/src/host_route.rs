@@ -428,7 +428,8 @@ fn spawn_driver(
     target_name: &str,
 ) -> Result<Child, FixtureError> {
     let stderr = fs::File::create(&paths.stderr).map_err(io_validation)?;
-    Command::new(executable)
+    let mut command = driver_command(executable);
+    command
         .arg("--scenario")
         .arg(&paths.scenario)
         .arg("--resolved-scenario")
@@ -447,6 +448,32 @@ fn spawn_driver(
         .stderr(Stdio::from(stderr))
         .spawn()
         .map_err(|error| validation(format!("failed to start host-route target: {error}")))
+}
+
+fn driver_command(executable: &Path) -> Command {
+    driver_command_for(executable, cfg!(windows), std::env::var_os("COMSPEC"))
+}
+
+fn driver_command_for(
+    executable: &Path,
+    windows: bool,
+    command_processor: Option<std::ffi::OsString>,
+) -> Command {
+    if windows
+        && executable
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| {
+                extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
+            })
+    {
+        let command_processor = command_processor.unwrap_or_else(|| "cmd.exe".into());
+        let mut command = Command::new(command_processor);
+        command.arg("/d").arg("/s").arg("/c").arg(executable);
+        return command;
+    }
+
+    Command::new(executable)
 }
 
 async fn wait_for_ready(
@@ -777,8 +804,8 @@ fn io_validation(error: std::io::Error) -> FixtureError {
 #[cfg(test)]
 mod tests {
     use super::{
-        accept_retry_delay, closure_probe_timeout, driver_result, runner_evidence_path,
-        websocket_locator,
+        accept_retry_delay, closure_probe_timeout, driver_command, driver_command_for,
+        driver_result, runner_evidence_path, websocket_locator,
     };
     use nnrp_conformance_fixtures::{
         ApiProfileCaseOutcome, WireConformanceCaseResult, WireConformanceCaseResultReport,
@@ -787,6 +814,33 @@ mod tests {
     };
     use nnrp_runtime::{RuntimeError, RuntimeTransportKind};
     use std::{path::Path, time::Duration};
+
+    #[test]
+    fn windows_command_driver_uses_the_command_processor() {
+        let executable = Path::new(r"C:\target path\host.cmd");
+        let command = driver_command_for(executable, true, Some("test-command-processor".into()));
+        let arguments = command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(command.get_program(), "test-command-processor");
+        assert_eq!(&arguments[..3], ["/d", "/s", "/c"]);
+        assert_eq!(arguments[3], executable.to_string_lossy());
+    }
+
+    #[test]
+    fn native_driver_is_started_directly() {
+        let executable = if cfg!(windows) {
+            Path::new(r"C:\target\host.exe")
+        } else {
+            Path::new("/target/host")
+        };
+        let command = driver_command(executable);
+
+        assert_eq!(command.get_program(), executable.as_os_str());
+        assert_eq!(command.get_args().count(), 0);
+    }
 
     #[test]
     fn websocket_locator_uses_bound_port_and_security_scheme() {
