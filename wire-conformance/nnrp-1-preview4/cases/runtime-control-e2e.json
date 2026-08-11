@@ -52,6 +52,54 @@
       }
     },
     {
+      "id": "wire.control.deadline-before-submit.client",
+      "mode": "suite_as_client",
+      "transport": "tcp",
+      "status": "experimental",
+      "feature": "control.deadline_expire",
+      "required_capabilities": [
+        "control.deadline_expire"
+      ],
+      "description": "Runner sends DEADLINE before FRAME_SUBMIT with the same operation and frame identity, then verifies the target applies the reservation without an SDK adapter.",
+      "steps": [
+        {
+          "action": "send",
+          "frame": "DEADLINE",
+          "payload": {
+            "operation_id": "op-deadline-before-submit-1",
+            "frame_id": 1,
+            "unix_ms": 4000000000000
+          }
+        },
+        {
+          "action": "send",
+          "frame": "REQUEST",
+          "payload": {
+            "operation_id": "op-deadline-before-submit-1",
+            "frame_id": 1
+          }
+        },
+        {
+          "action": "receive",
+          "frame": "RESULT_PUSH",
+          "timeout_ms": 1000
+        }
+      ],
+      "expect": {
+        "terminal": "success",
+        "frames": [
+          "DEADLINE",
+          "REQUEST",
+          "RESULT_PUSH"
+        ],
+        "allowed_frames": [
+          "DEADLINE",
+          "REQUEST",
+          "RESULT_PUSH"
+        ]
+      }
+    },
+    {
       "id": "wire.control.priority-deadline.proxy",
       "mode": "suite_as_proxy",
       "transport": "quic",

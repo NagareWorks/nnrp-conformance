@@ -11,8 +11,8 @@ use nnrp_conformance::wire_endpoint::{
     ReferenceTransport, WireEndpointSecurity, WireReferenceEndpoint,
 };
 use nnrp_conformance::wire_external::{
-    cancel_drop_reason, cancel_trace, canonical_cache_miss, canonical_response_body,
-    canonical_result, canonical_trace_body,
+    cancel_drop_reason, cancel_trace, canonical_cache_miss, canonical_pre_submit_deadline,
+    canonical_response_body, canonical_result, canonical_trace_body,
 };
 use nnrp_conformance_fixtures::{
     WireConformanceLimits, WireConformanceMode, WireConformanceTarget,
@@ -107,6 +107,7 @@ async fn run_reference_target(manifest_path: &Path, profile: TargetProfile) -> R
     )?;
 
     cancel_target(&tcp_server).await?;
+    deadline_before_submit_target(&tcp_server).await?;
     drop(tcp_server);
     priority_target(&quic_server).await?;
     progress_target_with_retry(WireReferenceEndpoint::secure(
@@ -338,6 +339,55 @@ async fn cancel_target(server: &NnrpServer) -> Result<()> {
             Vec::new(),
         )
         .await?;
+    close_server_session(&mut session).await
+}
+
+async fn deadline_before_submit_target(server: &NnrpServer) -> Result<()> {
+    let mut session = server.accept().await?;
+    let deadline = canonical_pre_submit_deadline(151);
+    match session.await_event().await? {
+        NnrpServerEvent::Runtime(NnrpRuntimeEvent {
+            header,
+            metadata: NnrpRuntimeEventMetadata::Scheduling(metadata),
+            tail: NnrpRuntimeEventTail::None,
+        }) if header.message_type == MessageType::Deadline
+            && header.frame_id == 1
+            && metadata == deadline =>
+        {
+            if session
+                .operations()
+                .operation(deadline.operation_id)
+                .is_some()
+            {
+                bail!("deadline target registered the operation before FRAME_SUBMIT");
+            }
+        }
+        event => bail!("deadline target expected DEADLINE before FRAME_SUBMIT, got {event:?}"),
+    }
+
+    let submit = match session.await_event().await? {
+        NnrpServerEvent::Submit(operation) => operation,
+        event => bail!("deadline target expected FRAME_SUBMIT after DEADLINE, got {event:?}"),
+    };
+    if submit.frame_id != 1
+        || submit.operation_id != deadline.operation_id
+        || session
+            .operations()
+            .operation(submit.operation_id)
+            .map(|operation| operation.schedule.deadline_unix_ms)
+            != Some(deadline.deadline_unix_ms)
+    {
+        bail!("deadline target did not apply the pre-submit reservation");
+    }
+
+    submit
+        .send_result(
+            &mut session,
+            canonical_result(),
+            canonical_response_body().to_vec(),
+        )
+        .await?;
+    expect_completed_lifecycle(&mut session, submit.operation_id).await?;
     close_server_session(&mut session).await
 }
 

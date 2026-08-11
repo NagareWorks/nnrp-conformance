@@ -614,7 +614,7 @@ dependencies = [
 [[package]]
 name = "nnrp-conformance"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "http",
  "nnrp-core",
@@ -663,7 +663,7 @@ dependencies = [
 [[package]]
 name = "nnrp-core"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "thiserror",
 ]
@@ -671,7 +671,7 @@ dependencies = [
 [[package]]
 name = "nnrp-ffi"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "async-trait",
  "http",
@@ -685,7 +685,7 @@ dependencies = [
 [[package]]
 name = "nnrp-runtime"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "async-trait",
  "futures-channel",
@@ -693,6 +693,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.3.4",
  "http",
+ "js-sys",
  "nnrp-core",
  "nnrp-transport-provider",
  "thiserror",
@@ -703,7 +704,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-ipc"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -715,7 +716,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-provider"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "nnrp-core",
  "thiserror",
@@ -724,7 +725,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-quic"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -740,7 +741,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-tcp"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "async-trait",
  "nnrp-core",
@@ -754,7 +755,7 @@ dependencies = [
 [[package]]
 name = "nnrp-transport-websocket"
 version = "1.0.0-preview.4.22"
-source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=11f3afcb12a71cde39a02fd918a51a542ae0c7fb#11f3afcb12a71cde39a02fd918a51a542ae0c7fb"
+source = "git+https://github.com/NagareWorks/nnrp-rs.git?rev=4828788ddb923acb424ec81f519e942ac0155a9d#4828788ddb923acb424ec81f519e942ac0155a9d"
 dependencies = [
  "async-trait",
  "futures-util",

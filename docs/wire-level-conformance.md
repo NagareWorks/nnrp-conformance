@@ -229,14 +229,19 @@ remains invalid/unset under the scheduling metadata contract.
 
 ## Current implementation boundary
 
-The current runner has typed executors for all six frame-level preview4 scenarios and all twelve
-host-route scenarios. Repository CI selects the six frame scenarios and eleven native host-route
+The current runner has typed executors for all seven frame-level preview4 scenarios and all twelve
+host-route scenarios. Repository CI selects the seven frame scenarios and eleven native host-route
 scenarios across the ten installed-provider cases and the uninstalled-QUIC target profile, drives
 independent target processes over TCP, QUIC, IPC, and secure WebSocket endpoints, and validates both generated result
 reports with zero skipped cases. It also runs the ten installed native host-route scenarios
 against client-only and server-only targets and requires the unsupported half to fail. The browser
 WSS scenario remains part of the mandatory suite and is selected when a target declares the browser
 provider identity.
+
+The client-side deadline scenario sends `DEADLINE` before `FRAME_SUBMIT` with one operation and
+frame identity. The independent target verifies that no operation exists before submission and
+that the reserved deadline is attached when the submit arrives. This checks wire order and runtime
+semantics directly instead of accepting an SDK adapter that emits the same final result.
 
 Third-party live endpoints use the same target manifest and execution-plan contract. Adapter
 execution remains separate and should not be used to prove wire-level semantics.
