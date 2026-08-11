@@ -19,6 +19,8 @@ use nnrp_runtime::{NnrpServer, RuntimeError};
 use nnrp_transport_quic::QuicServerEndpointConfig;
 use tokio::{sync::mpsc, task::JoinHandle};
 
+const HOST_ROUTE_DRIVER_STARTUP_GRACE_MS: u64 = 15_000;
+
 pub(crate) async fn run_host_route_scenario(
     scenario: &WireConformanceScenario,
     target_executable: &Path,
@@ -742,7 +744,7 @@ fn wire_timeout(scenario: &WireConformanceScenario) -> Duration {
     Duration::from_millis(
         declared_timeout_ms(scenario)
             .unwrap_or(0)
-            .saturating_add(5_000),
+            .saturating_add(HOST_ROUTE_DRIVER_STARTUP_GRACE_MS),
     )
 }
 
@@ -804,8 +806,9 @@ fn io_validation(error: std::io::Error) -> FixtureError {
 #[cfg(test)]
 mod tests {
     use super::{
-        accept_retry_delay, closure_probe_timeout, driver_command, driver_command_for,
-        driver_result, runner_evidence_path, websocket_locator,
+        HOST_ROUTE_DRIVER_STARTUP_GRACE_MS, accept_retry_delay, closure_probe_timeout,
+        driver_command, driver_command_for, driver_result, runner_evidence_path, websocket_locator,
+        wire_timeout,
     };
     use nnrp_conformance_fixtures::{
         ApiProfileCaseOutcome, WireConformanceCaseResult, WireConformanceCaseResultReport,
@@ -924,6 +927,28 @@ mod tests {
             assert_eq!(
                 closure_probe_timeout(scenario),
                 Duration::from_millis(declared_ms.clamp(1_000, 5_000))
+            );
+        }
+    }
+
+    #[test]
+    fn wire_timeout_reserves_external_driver_startup_budget() {
+        let manifest_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../wire-conformance/nnrp-1-preview4/cases/host-route-e2e.json");
+        let manifest: WireConformanceScenarioManifest = load_json_file(&manifest_path).unwrap();
+
+        for scenario in &manifest.scenarios {
+            let declared_ms = scenario
+                .steps
+                .iter()
+                .filter_map(|step| step.timeout_ms)
+                .max()
+                .unwrap_or(0);
+            assert_eq!(
+                wire_timeout(scenario),
+                Duration::from_millis(
+                    declared_ms.saturating_add(HOST_ROUTE_DRIVER_STARTUP_GRACE_MS)
+                )
             );
         }
     }
