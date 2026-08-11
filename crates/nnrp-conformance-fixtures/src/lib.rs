@@ -898,7 +898,7 @@ mod tests {
         ApiProfileCaseResultReport, ApiProfileExecutionPlan, ApiProfileRecipe,
         ApiProfileSuiteManifest, BenchmarkExecutionPlan, BenchmarkResultReport, CapabilityManifest,
         CaseManifest, CaseStatus, ProtocolManifest, SemanticVectorManifest,
-        WireConformanceCaseResultReport, WireConformanceExecutionPlan,
+        WireConformanceCaseResultReport, WireConformanceExecutionPlan, WireConformanceMode,
         WireConformanceScenarioManifest, WireConformanceSuiteManifest,
         WireConformanceTargetManifest, WireConformanceTransport, WireHostCredentialOwner,
         WireHostPlatform, WireHostRouteReadyReport, WireHostRouteRejectionReason,
@@ -1457,11 +1457,25 @@ mod tests {
             all_scenarios.extend(scenarios.scenarios);
         }
 
-        assert_eq!(all_scenarios.len(), 18);
+        assert_eq!(all_scenarios.len(), 19);
         assert!(
             all_scenarios
                 .iter()
                 .any(|scenario| scenario.feature == "control.cancel_abort")
+        );
+
+        let deadline_scenario = all_scenarios
+            .iter()
+            .find(|scenario| scenario.id == "wire.control.deadline-before-submit.client")
+            .expect("wire suite should include the pre-submit deadline scenario");
+        assert_eq!(deadline_scenario.mode, WireConformanceMode::SuiteAsClient);
+        assert_eq!(
+            deadline_scenario.transport,
+            Some(WireConformanceTransport::Tcp)
+        );
+        assert_eq!(
+            deadline_scenario.required_capabilities,
+            vec!["control.deadline_expire"]
         );
 
         let cache_scenario = all_scenarios

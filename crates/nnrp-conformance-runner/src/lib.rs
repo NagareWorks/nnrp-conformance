@@ -1317,6 +1317,9 @@ fn wire_external_case_for_scenario(
 ) -> Result<WireExternalCase, FixtureError> {
     let case = match scenario.id.as_str() {
         "wire.control.cancel-abort.client" => WireExternalCase::CancelAbortClient,
+        "wire.control.deadline-before-submit.client" => {
+            WireExternalCase::DeadlineBeforeSubmitClient
+        }
         "wire.control.priority-deadline.proxy" => WireExternalCase::PriorityDeadlineProxy,
         "wire.control.progress-backpressure.server" => WireExternalCase::ProgressBackpressureServer,
         "wire.control.capability-route-cache.client" => {
@@ -1482,6 +1485,7 @@ fn wire_direction(direction: WireExternalDirection) -> WireConformanceFrameDirec
 fn wire_frame(frame: WireExternalFrame) -> &'static str {
     match frame {
         WireExternalFrame::Request => "REQUEST",
+        WireExternalFrame::Deadline => "DEADLINE",
         WireExternalFrame::Cancel => "CANCEL",
         WireExternalFrame::PriorityUpdate => "PRIORITY_UPDATE",
         WireExternalFrame::ExpireAt => "EXPIRE_AT",
@@ -4126,6 +4130,19 @@ mod tests {
                 .expect("frozen scenario should have a typed executor")
                 .scenario_id(),
             known.id
+        );
+
+        let deadline = sample_wire_scenario(
+            "wire.control.deadline-before-submit.client",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.deadline_expire"],
+        );
+        assert_eq!(
+            wire_external_case_for_scenario(&deadline)
+                .expect("deadline scenario should have a typed executor")
+                .scenario_id(),
+            deadline.id
         );
 
         let unknown = sample_wire_scenario(
