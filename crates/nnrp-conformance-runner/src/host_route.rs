@@ -20,6 +20,7 @@ use nnrp_transport_quic::QuicServerEndpointConfig;
 use tokio::{sync::mpsc, task::JoinHandle};
 
 const HOST_ROUTE_DRIVER_STARTUP_GRACE_MS: u64 = 15_000;
+const ACCEPTED_SESSION_CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub(crate) async fn run_host_route_scenario(
     scenario: &WireConformanceScenario,
@@ -193,7 +194,16 @@ fn spawn_accept_loop(
                     let _ = sender
                         .send((peer.route.transport, peer.route.provider_id.clone()))
                         .await;
-                    let _ = session.close().await;
+                    let mut session = session;
+                    if let Ok(Ok(close)) = tokio::time::timeout(
+                        ACCEPTED_SESSION_CLOSE_TIMEOUT,
+                        session.receive_close(),
+                    )
+                    .await
+                    {
+                        let _ = session.ack_close(&close).await;
+                    }
+                    let _ = session.close_in_place().await;
                     return;
                 }
                 Err(error) => match accept_retry_delay(&error) {

@@ -607,6 +607,8 @@ pub struct WireConformanceExpectation {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allowed_frames: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub result_drop_reason_code: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub route: Option<WireHostRouteExpectation>,
 }
 

@@ -20,7 +20,7 @@ use nnrp_conformance_fixtures::{
     WireConformanceTransportSecurity, WireHostPlatform, WireHostRouteProviderCapability,
     WireHostRouteSecurityMode,
 };
-use nnrp_core::{MessageType, OperationState};
+use nnrp_core::{MessageType, OperationState, ResultDropReasonMetadata};
 use nnrp_runtime::{
     NnrpClientRoleEvent, NnrpRuntimeEvent, NnrpRuntimeEventMetadata, NnrpRuntimeEventTail,
     NnrpServer, NnrpServerEvent, NnrpServerSession, NnrpSubmitHeaderContext, NnrpSubmitIdentity,
@@ -44,6 +44,8 @@ enum TargetProfile {
     HostRouteOnly,
     UninstalledQuic,
 }
+
+const RESULT_DROP_REASON_SUPERSEDED: u16 = 0x0002;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -405,11 +407,22 @@ async fn priority_target(server: &NnrpServer) -> Result<()> {
     submit
         .send_result_drop(
             &mut session,
-            cancel_drop_reason(submit.operation_id),
+            priority_drop_reason(submit.operation_id),
             Vec::new(),
         )
         .await?;
     close_server_session(&mut session).await
+}
+
+fn priority_drop_reason(operation_id: u64) -> ResultDropReasonMetadata {
+    ResultDropReasonMetadata {
+        operation_id,
+        result_sequence: 0,
+        drop_reason_code: RESULT_DROP_REASON_SUPERSEDED,
+        source_role: 1,
+        flags: 0,
+        diagnostic_bytes: 0,
+    }
 }
 
 async fn cache_target(server: &NnrpServer) -> Result<()> {
@@ -590,7 +603,7 @@ fn cleanup_ipc_endpoint(endpoint: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::write_file_atomically;
+    use super::{RESULT_DROP_REASON_SUPERSEDED, priority_drop_reason, write_file_atomically};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -611,5 +624,13 @@ mod tests {
 
         assert_eq!(std::fs::read_to_string(&destination).unwrap(), "new");
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn priority_target_reports_superseded() {
+        let metadata = priority_drop_reason(42);
+
+        assert_eq!(metadata.operation_id, 42);
+        assert_eq!(metadata.drop_reason_code, RESULT_DROP_REASON_SUPERSEDED);
     }
 }
