@@ -313,6 +313,11 @@
                 "minItems": 1,
                 "uniqueItems": true
               },
+              "result_drop_reason_code": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
               "route": {"$ref": "#/$defs/hostRouteExpectation"}
             },
             "additionalProperties": false
@@ -332,7 +337,8 @@
                   "not": {
                     "anyOf": [
                       {"required": ["frames"]},
-                      {"required": ["allowed_frames"]}
+                      {"required": ["allowed_frames"]},
+                      {"required": ["result_drop_reason_code"]}
                     ]
                   }
                 }

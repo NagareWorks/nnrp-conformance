@@ -426,6 +426,36 @@ fn validate_wire_scenario_shape(scenario: &WireConformanceScenario) -> Result<()
             ),
         });
     }
+    if scenario.host_route.is_some() && scenario.expect.result_drop_reason_code.is_some() {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire host-route scenario {} must not declare result_drop_reason_code",
+                scenario.id
+            ),
+        });
+    }
+    if scenario.expect.result_drop_reason_code == Some(0) {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire scenario {} result_drop_reason_code must be non-zero",
+                scenario.id
+            ),
+        });
+    }
+    if scenario.expect.result_drop_reason_code.is_some()
+        && !scenario
+            .expect
+            .frames
+            .iter()
+            .any(|frame| frame == "RESULT_DROP_REASON")
+    {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire scenario {} declares result_drop_reason_code without RESULT_DROP_REASON",
+                scenario.id
+            ),
+        });
+    }
     if scenario.transport.is_some() {
         if scenario.expect.frames.is_empty() || scenario.expect.allowed_frames.is_empty() {
             return Err(FixtureError::Validation {
@@ -806,6 +836,7 @@ pub fn validate_wire_conformance_results(
                     };
                     observed_cursor += relative_index + 1;
                 }
+                validate_result_drop_reason(expected_scenario, result)?;
                 validate_wire_route_evidence(expected_plan, expected_scenario, result)?;
                 summary.passed_scenarios += 1;
             }
@@ -824,6 +855,40 @@ pub fn validate_wire_conformance_results(
     }
 
     Ok(summary)
+}
+
+fn validate_result_drop_reason(
+    scenario: &WireConformanceScenario,
+    result: &WireConformanceCaseResult,
+) -> Result<(), FixtureError> {
+    let Some(expected_code) = scenario.expect.result_drop_reason_code else {
+        return Ok(());
+    };
+    let observed_codes = result
+        .observed_frames
+        .iter()
+        .filter(|frame| frame.frame == "RESULT_DROP_REASON")
+        .map(|frame| {
+            frame
+                .payload
+                .as_ref()
+                .and_then(|payload| payload.get("drop_reason_code"))
+                .and_then(serde_json::Value::as_u64)
+        })
+        .collect::<Vec<_>>();
+    if observed_codes.is_empty()
+        || observed_codes
+            .iter()
+            .any(|code| *code != Some(u64::from(expected_code)))
+    {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire scenario {} result drop reason mismatch: expected {}, got {:?}",
+                result.id, expected_code, observed_codes
+            ),
+        });
+    }
+    Ok(())
 }
 
 fn validate_wire_route_evidence(
@@ -3115,6 +3180,7 @@ mod tests {
                 terminal: WireConformanceTerminal::Cancelled,
                 frames: vec!["CANCEL_ACK".to_string()],
                 allowed_frames: vec!["CANCEL_ACK".to_string()],
+                result_drop_reason_code: None,
                 route: None,
             },
         }
@@ -3204,6 +3270,7 @@ mod tests {
                 terminal: WireConformanceTerminal::Success,
                 frames: vec![],
                 allowed_frames: vec![],
+                result_drop_reason_code: None,
                 route: Some(WireHostRouteExpectation {
                     selected_count: Some(1),
                     selected_transport: None,
@@ -3535,6 +3602,52 @@ mod tests {
         )
         .expect_err("frame-only transport scenarios must not declare route expectations");
         assert!(error.to_string().contains("exactly when"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_invalid_result_drop_reason_expectations() {
+        let target = sample_wire_target();
+        let artifacts = AdapterArtifactContext {
+            results_path: "artifacts/wire-results.json".to_string(),
+            evidence_dir: "artifacts/wire-evidence".to_string(),
+        };
+        let mut scenario = sample_wire_scenario(
+            "wire.control.invalid-drop-reason",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        );
+        scenario.expect.result_drop_reason_code = Some(0);
+        let error =
+            build_wire_conformance_execution_plan(&target, &[scenario.clone()], artifacts.clone())
+                .expect_err("zero is not a registered result drop reason");
+        assert!(error.to_string().contains("must be non-zero"));
+
+        scenario.expect.result_drop_reason_code = Some(3);
+        let error = build_wire_conformance_execution_plan(&target, &[scenario], artifacts)
+            .expect_err("a typed drop reason requires the corresponding frame");
+        assert!(error.to_string().contains("without RESULT_DROP_REASON"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_result_drop_reason_on_host_route_scenario() {
+        let target = sample_host_route_target();
+        let mut scenario = sample_host_route_scenario();
+        scenario.expect.result_drop_reason_code = Some(3);
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("host-route evidence must not declare frame-level drop reasons");
+        assert!(
+            error
+                .to_string()
+                .contains("must not declare result_drop_reason_code")
+        );
     }
 
     #[test]
@@ -3972,6 +4085,69 @@ mod tests {
         .expect_err("wire results should reject missing expected frame");
 
         assert!(error.to_string().contains("CANCEL_ACK"));
+    }
+
+    #[test]
+    fn wire_results_require_the_declared_result_drop_reason_code() {
+        let mut scenario = sample_wire_scenario(
+            "selected",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        );
+        scenario.expect.frames = vec!["RESULT_DROP_REASON".to_string()];
+        scenario.expect.allowed_frames = scenario.expect.frames.clone();
+        scenario.expect.result_drop_reason_code = Some(3);
+        let plan = build_wire_conformance_execution_plan(
+            &sample_wire_target(),
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("wire execution plan should build");
+        let report = |drop_reason_code| WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "selected".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Cancelled,
+                observed_frames: vec![WireConformanceObservedFrame {
+                    direction: WireConformanceFrameDirection::Received,
+                    frame: "RESULT_DROP_REASON".to_string(),
+                    payload: Some(serde_json::json!({
+                        "drop_reason_code": drop_reason_code,
+                    })),
+                    timestamp_us: Some(100),
+                }],
+                route_evidence: None,
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+
+        validate_wire_conformance_results(&plan, &report(3))
+            .expect("matching result drop reason should validate");
+        let error = validate_wire_conformance_results(&plan, &report(1))
+            .expect_err("mismatched result drop reason should fail");
+        assert!(error.to_string().contains("expected 3, got [Some(1)]"));
+
+        let mut repeated = report(3);
+        repeated.results[0]
+            .observed_frames
+            .push(WireConformanceObservedFrame {
+                direction: WireConformanceFrameDirection::Received,
+                frame: "RESULT_DROP_REASON".to_string(),
+                payload: Some(serde_json::json!({ "drop_reason_code": 2 })),
+                timestamp_us: Some(101),
+            });
+        let error = validate_wire_conformance_results(&plan, &repeated)
+            .expect_err("every repeated drop reason must retain the declared code");
+        assert!(error.to_string().contains("[Some(3), Some(2)]"));
     }
 
     #[test]
