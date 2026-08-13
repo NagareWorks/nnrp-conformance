@@ -402,6 +402,7 @@ async fn main() -> Result<()> {
             let adapter_results: AdapterCaseResultReport = load_json_file(&results)?;
             let summary = validate_adapter_results(&adapter_plan, &adapter_results)?;
             println!("{}", serde_json::to_string_pretty(&summary)?);
+            ensure_adapter_run_passed(&summary)?;
         }
         Command::ValidateBenchmarkResults { plan, results } => {
             let benchmark_plan: BenchmarkExecutionPlan = load_json_file(&plan)?;
@@ -764,9 +765,23 @@ fn validate_adapter_results(
     Ok(summary)
 }
 
+fn ensure_adapter_run_passed(summary: &AdapterValidationSummary) -> Result<()> {
+    anyhow::ensure!(
+        summary.fail_cases == 0 && summary.skipped_cases == 0 && summary.error_cases == 0,
+        "adapter validation reported {} failed, {} skipped, and {} errored selected case(s)",
+        summary.fail_cases,
+        summary.skipped_cases,
+        summary.error_cases
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ensure_wire_run_passed, validate_adapter_results, validate_benchmark_results};
+    use super::{
+        ensure_adapter_run_passed, ensure_wire_run_passed, validate_adapter_results,
+        validate_benchmark_results,
+    };
     use nnrp_conformance_fixtures::{
         AdapterArtifactContext, AdapterCaseOutcome, AdapterCaseResult, AdapterCaseResultReport,
         AdapterExecutionCase, AdapterExecutionPlan, BenchmarkArtifactContext, BenchmarkCategory,
@@ -808,7 +823,7 @@ mod tests {
     }
 
     #[test]
-    fn adapter_results_validate_when_report_matches_selected_cases() {
+    fn adapter_results_summarize_all_selected_outcomes() {
         let summary = validate_adapter_results(
             &sample_plan(),
             &AdapterCaseResultReport {
@@ -838,6 +853,47 @@ mod tests {
         assert_eq!(summary.selected_cases, 2);
         assert_eq!(summary.error_cases, 1);
         assert_eq!(summary.skipped_cases, 1);
+        let error = ensure_adapter_run_passed(&summary)
+            .expect_err("selected adapter errors must fail the validation command");
+        assert!(
+            error
+                .to_string()
+                .contains("0 failed, 1 skipped, and 1 errored")
+        );
+    }
+
+    #[test]
+    fn adapter_run_exit_gate_rejects_skipped_selected_cases() {
+        let error = ensure_adapter_run_passed(&super::AdapterValidationSummary {
+            selected_cases: 2,
+            pass_cases: 1,
+            fail_cases: 0,
+            skipped_cases: 1,
+            error_cases: 0,
+        })
+        .expect_err("selected adapter skips must fail the validation command");
+        assert!(
+            error
+                .to_string()
+                .contains("0 failed, 1 skipped, and 0 errored")
+        );
+    }
+
+    #[test]
+    fn adapter_run_exit_gate_rejects_failed_cases() {
+        let error = ensure_adapter_run_passed(&super::AdapterValidationSummary {
+            selected_cases: 1,
+            pass_cases: 0,
+            fail_cases: 1,
+            skipped_cases: 0,
+            error_cases: 0,
+        })
+        .expect_err("selected adapter failures must fail the validation command");
+        assert!(
+            error
+                .to_string()
+                .contains("1 failed, 0 skipped, and 0 errored")
+        );
     }
 
     #[test]
