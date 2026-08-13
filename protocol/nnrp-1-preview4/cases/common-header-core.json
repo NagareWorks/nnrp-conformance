@@ -9,7 +9,10 @@
       "status": "mandatory",
       "feature": "header.fixed_shape",
       "required_capabilities": [],
-      "description": "Parse and re-emit the canonical 40-byte Preview4 common header without changing version, wire format, message type, flags, lengths, session, frame, view, route, or trace fields. Native handle generation is not part of this wire projection."
+      "description": "Parse and re-emit the canonical 40-byte Preview4 common header without changing version, wire format, message type, flags, lengths, session, frame, view, route, or trace fields. Native handle generation is not part of this wire projection.",
+      "parameters": {
+        "header_hex": "4e4e525001001028210000003000000000100000070000000b0000000200000015cd5b0700000000"
+      }
     }
   ]
 }

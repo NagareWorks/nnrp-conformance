@@ -185,6 +185,7 @@ fn build_adapter_execution_plan_from_cases<'a>(
             feature: case.feature.clone(),
             required_capabilities: case.required_capabilities.clone(),
             description: case.description.clone(),
+            parameters: case.parameters.clone(),
         })
         .collect();
 
@@ -2380,6 +2381,7 @@ mod tests {
                 feature: "flow_update".to_string(),
                 required_capabilities: vec!["flow_update".to_string()],
                 description: "test".to_string(),
+                parameters: BTreeMap::new(),
             }],
         };
         let capability_manifest = CapabilityManifest {
@@ -2426,6 +2428,7 @@ mod tests {
                 feature: "flow_update".to_string(),
                 required_capabilities: vec!["flow_update".to_string()],
                 description: "test".to_string(),
+                parameters: BTreeMap::new(),
             }],
         };
         let capability_manifest = CapabilityManifest {
@@ -2470,6 +2473,7 @@ mod tests {
                 feature: "flow_update".to_string(),
                 required_capabilities: vec!["flow_update".to_string()],
                 description: "test".to_string(),
+                parameters: BTreeMap::new(),
             }],
         };
 
@@ -2512,6 +2516,7 @@ mod tests {
                 feature: "header.fixed_shape".to_string(),
                 required_capabilities: vec![],
                 description: "test".to_string(),
+                parameters: BTreeMap::new(),
             }],
         };
         let case_manifest_b = CaseManifest {
@@ -2525,6 +2530,7 @@ mod tests {
                 feature: "transport.tcp".to_string(),
                 required_capabilities: vec!["transport.tcp".to_string()],
                 description: "test".to_string(),
+                parameters: BTreeMap::new(),
             }],
         };
         let capability_manifest = CapabilityManifest {
@@ -2575,6 +2581,7 @@ mod tests {
                     feature: "flow_update".to_string(),
                     required_capabilities: vec!["flow_update".to_string()],
                     description: "test".to_string(),
+                    parameters: BTreeMap::new(),
                 },
                 CaseDefinition {
                     id: "l1.transport.tcp.minimum".to_string(),
@@ -2583,6 +2590,7 @@ mod tests {
                     feature: "transport.tcp".to_string(),
                     required_capabilities: vec!["transport.tcp".to_string()],
                     description: "test".to_string(),
+                    parameters: BTreeMap::new(),
                 },
                 CaseDefinition {
                     id: "l1.transport.tcp.fallback".to_string(),
@@ -2594,6 +2602,7 @@ mod tests {
                         "transport.common".to_string(),
                     ],
                     description: "test".to_string(),
+                    parameters: BTreeMap::new(),
                 },
             ],
         };
@@ -2666,6 +2675,10 @@ mod tests {
                     feature: "handshake.basic".to_string(),
                     required_capabilities: vec!["handshake.basic".to_string()],
                     description: "selected".to_string(),
+                    parameters: BTreeMap::from([(
+                        "metadata_hex".to_string(),
+                        serde_json::json!("0102"),
+                    )]),
                 },
                 CaseDefinition {
                     id: "l3.transport.quic.minimum".to_string(),
@@ -2674,6 +2687,7 @@ mod tests {
                     feature: "transport.quic".to_string(),
                     required_capabilities: vec!["transport.quic".to_string()],
                     description: "not claimed".to_string(),
+                    parameters: BTreeMap::new(),
                 },
                 CaseDefinition {
                     id: "l1.flow_update.connection.scope.validation".to_string(),
@@ -2682,6 +2696,7 @@ mod tests {
                     feature: "flow_update".to_string(),
                     required_capabilities: vec!["flow_update".to_string()],
                     description: "informational".to_string(),
+                    parameters: BTreeMap::new(),
                 },
             ],
         };
@@ -2708,6 +2723,10 @@ mod tests {
         assert_eq!(plan.implementation_name, "sample");
         assert_eq!(plan.cases.len(), 1);
         assert_eq!(plan.cases[0].id, "l1.handshake.basic");
+        assert_eq!(
+            plan.cases[0].parameters.get("metadata_hex"),
+            Some(&serde_json::json!("0102"))
+        );
     }
 
     #[test]

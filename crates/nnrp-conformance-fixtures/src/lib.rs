@@ -93,6 +93,8 @@ pub struct AdapterExecutionCase {
     pub feature: String,
     pub required_capabilities: Vec<String>,
     pub description: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub parameters: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -814,6 +816,8 @@ pub struct CaseDefinition {
     pub feature: String,
     pub required_capabilities: Vec<String>,
     pub description: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub parameters: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]

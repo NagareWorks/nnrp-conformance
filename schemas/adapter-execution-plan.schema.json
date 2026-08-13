@@ -85,6 +85,10 @@
           },
           "description": {
             "type": "string"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": true
           }
         },
         "additionalProperties": false

@@ -11,7 +11,10 @@
       "required_capabilities": [
         "payload.typed"
       ],
-      "description": "Parse and re-emit the current 24-byte typed payload descriptor with its explicit per-frame payload kind, schema binding, stream semantics, offset, and length."
+      "description": "Parse and re-emit the current 24-byte typed payload descriptor with its explicit per-frame payload kind, schema binding, stream semantics, offset, and length.",
+      "parameters": {
+        "descriptor_hex": "020002020110000003000000020000000800000018000000"
+      }
     }
   ]
 }
