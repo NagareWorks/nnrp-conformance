@@ -9,7 +9,10 @@
       "status": "mandatory",
       "feature": "handshake.basic",
       "required_capabilities": ["handshake.basic"],
-      "description": "Round-trip the canonical CLIENT_HELLO metadata used by the current NNRP/1 handshake."
+      "description": "Round-trip the canonical CLIENT_HELLO metadata used by the current NNRP/1 handshake.",
+      "parameters": {
+        "metadata_hex": "01010100010000000100000003000000030000002100000003000000010007000100020040000000000001007017640002000000000000006000000000000000"
+      }
     },
     {
       "id": "l0.control.session_patch_ack.golden",
@@ -17,7 +20,10 @@
       "status": "mandatory",
       "feature": "session.resume",
       "required_capabilities": ["session.resume", "session.open_close"],
-      "description": "Round-trip the canonical SESSION_PATCH_ACK metadata without changing session recovery semantics."
+      "description": "Round-trip the canonical SESSION_PATCH_ACK metadata without changing session recovery semantics.",
+      "parameters": {
+        "metadata_hex": "010003001100000044000000000000000200000028230000680105000300000000000000010000000300000010000000"
+      }
     },
     {
       "id": "l0.flow_update.packet.golden",
@@ -25,7 +31,10 @@
       "status": "mandatory",
       "feature": "flow_update",
       "required_capabilities": ["flow_update"],
-      "description": "Round-trip the canonical FLOW_UPDATE packet and preserve scoped credit and retry metadata."
+      "description": "Round-trip the canonical FLOW_UPDATE packet and preserve scoped credit and retry metadata.",
+      "parameters": {
+        "packet_hex": "4e4e5250010017280000000020000000000000001500000000000000000006000d000000000000000104020000000100000000000000000000000000280000000500000003000000"
+      }
     },
     {
       "id": "l0.result_hint.packet.golden",
@@ -33,7 +42,10 @@
       "status": "mandatory",
       "feature": "flow_update",
       "required_capabilities": ["flow_update"],
-      "description": "Round-trip the canonical RESULT_HINT packet and preserve its budget and congestion fields."
+      "description": "Round-trip the canonical RESULT_HINT packet and preserve its budget and congestion fields.",
+      "parameters": {
+        "packet_hex": "4e4e525001001828000000001000000000000000150000002f010000000007000e000000000000000300000003000000030000003c000000"
+      }
     },
     {
       "id": "l0.frame_submit.metadata.golden",
@@ -41,7 +53,10 @@
       "status": "mandatory",
       "feature": "frame_submit.tensor.inline",
       "required_capabilities": ["frame_submit.tensor.inline"],
-      "description": "Round-trip the canonical FRAME_SUBMIT metadata used by the current NNRP/1 submit path."
+      "description": "Round-trip the canonical FRAME_SUBMIT metadata used by the current NNRP/1 submit path.",
+      "parameters": {
+        "metadata_hex": "80026801200020005400020001020000640070170700000000000000c000000000000000000000000807060504030201000000000205ff0003000000290000001100000002000000"
+      }
     },
     {
       "id": "l0.result_push.metadata.golden",
@@ -49,7 +64,10 @@
       "status": "mandatory",
       "feature": "result_push.basic",
       "required_capabilities": ["result_push.basic"],
-      "description": "Round-trip the canonical RESULT_PUSH metadata, including status, result class, flags, and payload bookkeeping."
+      "description": "Round-trip the canonical RESULT_PUSH metadata, including status, result class, flags, and payload bookkeeping.",
+      "parameters": {
+        "metadata_hex": "0000050001005400020000004b0302004e030000000000001000000000000000000000000000000000000000010100002900000035001f000300000003000000"
+      }
     },
     {
       "id": "l0.body_region.prelude.golden",
@@ -57,7 +75,10 @@
       "status": "mandatory",
       "feature": "payload.typed",
       "required_capabilities": ["payload.typed"],
-      "description": "Round-trip the canonical typed-payload body-region prelude."
+      "description": "Round-trip the canonical typed-payload body-region prelude.",
+      "parameters": {
+        "metadata_hex": "1800000018000000180000000e00000010000000050000000000000000000000"
+      }
     },
     {
       "id": "l0.object_reference.block.golden",
@@ -65,7 +86,10 @@
       "status": "optional",
       "feature": "cache.lifecycle",
       "required_capabilities": ["cache.lifecycle"],
-      "description": "Round-trip the canonical cache-backed object-reference block."
+      "description": "Round-trip the canonical cache-backed object-reference block.",
+      "parameters": {
+        "metadata_hex": "020000000700000044332211000000008877665500000000"
+      }
     },
     {
       "id": "l0.typed_payload.descriptor.golden",
@@ -73,7 +97,10 @@
       "status": "mandatory",
       "feature": "payload.typed",
       "required_capabilities": ["payload.typed"],
-      "description": "Round-trip the inherited NNRP/1 typed-payload descriptor shape."
+      "description": "Round-trip the inherited NNRP/1 typed-payload descriptor shape.",
+      "parameters": {
+        "descriptor_hex": "10000300040000000700000000000000"
+      }
     },
     {
       "id": "l0.typed_payload.frame_regions.golden",
@@ -81,7 +108,11 @@
       "status": "mandatory",
       "feature": "payload.typed",
       "required_capabilities": ["payload.typed"],
-      "description": "Round-trip typed-payload frame regions across token, audio, video, and structured-event payload kinds."
+      "description": "Round-trip typed-payload frame regions across token, audio, video, and structured-event payload kinds.",
+      "parameters": {
+        "descriptor_region_hex": "020001000000000003000000000000000400020003000000020000000000000008000300050000000500000000000000100004000a0000000300000000000000",
+        "payload_hex": "746f6b6175766964656f657674"
+      }
     },
     {
       "id": "l1.flow_update.metadata.validation",

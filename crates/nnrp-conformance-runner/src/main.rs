@@ -809,6 +809,7 @@ mod tests {
                     feature: "handshake".to_string(),
                     required_capabilities: vec!["control.client_hello".to_string()],
                     description: "Basic handshake path".to_string(),
+                    parameters: BTreeMap::new(),
                 },
                 AdapterExecutionCase {
                     id: "l1.session.open_close".to_string(),
@@ -817,6 +818,7 @@ mod tests {
                     feature: "session_lifecycle".to_string(),
                     required_capabilities: vec!["control.session_open".to_string()],
                     description: "Session open close path".to_string(),
+                    parameters: BTreeMap::new(),
                 },
             ],
         }
