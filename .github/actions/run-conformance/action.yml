@@ -17,6 +17,10 @@ inputs:
     description: Optional PowerShell command that reads NNRP_CONFORMANCE_ADAPTER_PLAN and writes NNRP_CONFORMANCE_ADAPTER_RESULTS.
     required: false
     default: ""
+  require-complete-capability-coverage:
+    description: Require the SDK capability manifest to cover every capability token in the selected adapter case scope.
+    required: false
+    default: "false"
   artifact-name:
     description: Optional artifact name override.
     required: false
@@ -211,13 +215,21 @@ runs:
         }
 
         $runnerManifest = Join-Path '${{ steps.resolve.outputs.suite-root }}' 'Cargo.toml'
-        & cargo run --manifest-path $runnerManifest -p nnrp-conformance-runner -- `
-          adapter-plan `
-          --protocol '${{ steps.resolve.outputs.protocol-manifest }}' `
-          --capabilities '${{ steps.resolve.outputs.capabilities-path }}' `
-          --output '${{ steps.resolve.outputs.adapter-plan-path }}' `
-          --results-path '${{ steps.resolve.outputs.adapter-results-path }}' `
-          --evidence-dir '${{ steps.resolve.outputs.adapter-evidence-dir }}'
+        $arguments = @(
+          'run', '--manifest-path', $runnerManifest,
+          '-p', 'nnrp-conformance-runner', '--',
+          'adapter-plan',
+          '--protocol', '${{ steps.resolve.outputs.protocol-manifest }}',
+          '--capabilities', '${{ steps.resolve.outputs.capabilities-path }}',
+          '--output', '${{ steps.resolve.outputs.adapter-plan-path }}',
+          '--results-path', '${{ steps.resolve.outputs.adapter-results-path }}',
+          '--evidence-dir', '${{ steps.resolve.outputs.adapter-evidence-dir }}'
+        )
+        if ('${{ inputs.require-complete-capability-coverage }}' -eq 'true') {
+          $arguments += '--require-complete-capability-coverage'
+        }
+
+        & cargo @arguments
         if ($LASTEXITCODE -ne 0) {
           exit $LASTEXITCODE
         }

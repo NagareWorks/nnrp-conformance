@@ -16,7 +16,8 @@ use nnrp_conformance_runner::{
     build_benchmark_execution_plan, build_execution_plan, build_execution_plan_for_manifests,
     build_wire_conformance_execution_plan, run_wire_conformance_external,
     run_wire_conformance_external_with_host_target, summarize_wire_external_report,
-    validate_api_profile_results, validate_wire_conformance_results,
+    validate_api_profile_results, validate_complete_capability_coverage,
+    validate_wire_conformance_results,
 };
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -57,6 +58,8 @@ enum Command {
         results_path: PathBuf,
         #[arg(long, default_value = "artifacts/evidence")]
         evidence_dir: PathBuf,
+        #[arg(long)]
+        require_complete_capability_coverage: bool,
     },
     BenchmarkPlan {
         #[arg(long)]
@@ -220,6 +223,7 @@ async fn main() -> Result<()> {
             output,
             results_path,
             evidence_dir,
+            require_complete_capability_coverage,
         } => {
             let protocol_manifest: ProtocolManifest = load_json_file(&protocol)?;
             let capability_manifest: CapabilityManifest = load_json_file(&capabilities)?;
@@ -239,6 +243,14 @@ async fn main() -> Result<()> {
                 .iter()
                 .map(load_json_file::<CaseManifest>)
                 .collect::<Result<Vec<_>, _>>()?;
+            if require_complete_capability_coverage {
+                validate_complete_capability_coverage(
+                    &capability_manifest,
+                    case_manifests
+                        .iter()
+                        .flat_map(|manifest| manifest.cases.iter()),
+                )?;
+            }
             let artifacts = AdapterArtifactContext {
                 results_path: results_path.display().to_string(),
                 evidence_dir: evidence_dir.display().to_string(),
