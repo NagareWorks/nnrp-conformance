@@ -305,7 +305,6 @@ async fn run_server_scenario(
                 }
                 Err(error) => return Err(error),
             };
-        let mut sessions = Vec::with_capacity(bound_routes.len());
         for route in &bound_routes {
             let endpoint = wire_endpoint(
                 route,
@@ -315,9 +314,8 @@ async fn run_server_scenario(
             let client = connect_with_retry(&endpoint, wire_timeout(scenario)).await?;
             let session = client.open_session().await.map_err(runtime_validation)?;
             observed.insert((route.transport, route.provider_id.clone()));
-            sessions.push(session);
-        }
-        for session in sessions {
+            // Targets may serialize accept/close across listeners, so complete each
+            // route before opening the next one.
             match session.close().await {
                 Ok(()) | Err(RuntimeError::Io(_)) | Err(RuntimeError::TransportClosed { .. }) => {}
                 Err(error) => return Err(runtime_validation(error)),
