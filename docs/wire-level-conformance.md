@@ -197,6 +197,12 @@ Use adapter execution when the implementation only exposes an SDK-level entrypoi
 is to validate language binding semantics. Adapter execution consumes a capability manifest and an
 adapter execution plan.
 
+Official full-surface SDK validation sets the action input
+`require-complete-capability-coverage: "true"`. The runner then compares the SDK manifest with the
+union of capability tokens required by the selected protocol case scope and rejects plan generation
+when any token is missing. Partial third-party implementations leave the input disabled and continue
+to run only the cases selected by their declared capabilities.
+
 Use wire execution when the implementation exposes a live NNRP endpoint and the goal is to prove
 cross-implementation protocol semantics. Wire execution consumes a target manifest and a wire
 execution plan.

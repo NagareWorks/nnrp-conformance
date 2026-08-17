@@ -233,6 +233,37 @@ fn validate_declared_capabilities<'a>(
     })
 }
 
+pub fn validate_complete_capability_coverage<'a>(
+    capability_manifest: &CapabilityManifest,
+    cases: impl Iterator<Item = &'a CaseDefinition>,
+) -> Result<(), FixtureError> {
+    let required_capabilities = cases
+        .filter(|case| matches!(case.status, CaseStatus::Mandatory | CaseStatus::Optional))
+        .flat_map(|case| case.required_capabilities.iter().cloned())
+        .collect::<BTreeSet<_>>();
+    let declared_capabilities = capability_manifest
+        .supports
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let missing_capabilities = required_capabilities
+        .difference(&declared_capabilities)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if missing_capabilities.is_empty() {
+        return Ok(());
+    }
+
+    Err(FixtureError::Validation {
+        message: format!(
+            "capability manifest {} does not cover the complete adapter case scope; missing capability token(s): {}",
+            capability_manifest.implementation_name,
+            missing_capabilities.join(", ")
+        ),
+    })
+}
+
 pub fn build_benchmark_execution_plan(
     protocol_manifest: &ProtocolManifest,
     capability_manifest: &CapabilityManifest,
@@ -2335,7 +2366,8 @@ mod tests {
         build_api_profile_execution_plan, build_benchmark_execution_plan, build_execution_plan,
         build_execution_plan_for_manifests, build_wire_conformance_execution_plan,
         run_wire_conformance_external, validate_api_profile_results,
-        validate_wire_conformance_results, wire_external_case_for_scenario,
+        validate_complete_capability_coverage, validate_wire_conformance_results,
+        wire_external_case_for_scenario,
     };
     use nnrp_conformance_fixtures::{
         AdapterArtifactContext, ApiProfileCapabilityManifest, ApiProfileCaseOutcome,
@@ -2357,6 +2389,87 @@ mod tests {
     };
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn complete_capability_coverage_reports_every_missing_token() {
+        let cases = [
+            CaseDefinition {
+                id: "l1.handshake.basic".to_string(),
+                layer: CaseLayer::L1,
+                status: CaseStatus::Mandatory,
+                feature: "handshake.basic".to_string(),
+                required_capabilities: vec!["handshake.basic".to_string()],
+                description: "handshake".to_string(),
+                parameters: BTreeMap::new(),
+            },
+            CaseDefinition {
+                id: "l3.transport.probe".to_string(),
+                layer: CaseLayer::L3,
+                status: CaseStatus::Optional,
+                feature: "transport.probe".to_string(),
+                required_capabilities: vec![
+                    "transport.quic".to_string(),
+                    "transport.tcp".to_string(),
+                ],
+                description: "transport probe".to_string(),
+                parameters: BTreeMap::new(),
+            },
+            CaseDefinition {
+                id: "l4.control.supersede".to_string(),
+                layer: CaseLayer::L4,
+                status: CaseStatus::Experimental,
+                feature: "control.supersede".to_string(),
+                required_capabilities: vec!["control.supersede".to_string()],
+                description: "experimental supersede control".to_string(),
+                parameters: BTreeMap::new(),
+            },
+            CaseDefinition {
+                id: "l4.control.legacy".to_string(),
+                layer: CaseLayer::L4,
+                status: CaseStatus::Deprecated,
+                feature: "control.legacy".to_string(),
+                required_capabilities: vec!["control.legacy".to_string()],
+                description: "deprecated legacy control".to_string(),
+                parameters: BTreeMap::new(),
+            },
+        ];
+        let capability_manifest = CapabilityManifest {
+            schema: None,
+            implementation_name: "partial-sdk".to_string(),
+            protocol_version: "nnrp-1-preview4".to_string(),
+            supports: vec!["handshake.basic".to_string()],
+        };
+
+        let error = validate_complete_capability_coverage(&capability_manifest, cases.iter())
+            .expect_err("partial SDK coverage must be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            "fixture validation failed: capability manifest partial-sdk does not cover the complete adapter case scope; missing capability token(s): transport.quic, transport.tcp"
+        );
+    }
+
+    #[test]
+    fn complete_capability_coverage_accepts_the_full_case_scope() {
+        let cases = [CaseDefinition {
+            id: "l3.transport.probe".to_string(),
+            layer: CaseLayer::L3,
+            status: CaseStatus::Optional,
+            feature: "transport.probe".to_string(),
+            required_capabilities: vec!["transport.quic".to_string(), "transport.tcp".to_string()],
+            description: "transport probe".to_string(),
+            parameters: BTreeMap::new(),
+        }];
+        let capability_manifest = CapabilityManifest {
+            schema: None,
+            implementation_name: "complete-sdk".to_string(),
+            protocol_version: "nnrp-1-preview4".to_string(),
+            supports: vec!["transport.tcp".to_string(), "transport.quic".to_string()],
+        };
+
+        validate_complete_capability_coverage(&capability_manifest, cases.iter())
+            .expect("complete SDK coverage should pass");
+    }
 
     #[test]
     fn marks_unclaimed_capabilities_as_not_claimed() {
