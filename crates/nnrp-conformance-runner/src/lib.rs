@@ -238,6 +238,7 @@ pub fn validate_complete_capability_coverage<'a>(
     cases: impl Iterator<Item = &'a CaseDefinition>,
 ) -> Result<(), FixtureError> {
     let required_capabilities = cases
+        .filter(|case| matches!(case.status, CaseStatus::Mandatory | CaseStatus::Optional))
         .flat_map(|case| case.required_capabilities.iter().cloned())
         .collect::<BTreeSet<_>>();
     let declared_capabilities = capability_manifest
@@ -2411,6 +2412,24 @@ mod tests {
                     "transport.tcp".to_string(),
                 ],
                 description: "transport probe".to_string(),
+                parameters: BTreeMap::new(),
+            },
+            CaseDefinition {
+                id: "l4.control.supersede".to_string(),
+                layer: CaseLayer::L4,
+                status: CaseStatus::Experimental,
+                feature: "control.supersede".to_string(),
+                required_capabilities: vec!["control.supersede".to_string()],
+                description: "experimental supersede control".to_string(),
+                parameters: BTreeMap::new(),
+            },
+            CaseDefinition {
+                id: "l4.control.legacy".to_string(),
+                layer: CaseLayer::L4,
+                status: CaseStatus::Deprecated,
+                feature: "control.legacy".to_string(),
+                required_capabilities: vec!["control.legacy".to_string()],
+                description: "deprecated legacy control".to_string(),
                 parameters: BTreeMap::new(),
             },
         ];
