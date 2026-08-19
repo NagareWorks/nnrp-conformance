@@ -313,6 +313,23 @@
                 "minItems": 1,
                 "uniqueItems": true
               },
+              "frame_payload_invariants": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["frame", "fields"],
+                  "properties": {
+                    "frame": {"type": "string", "minLength": 1},
+                    "direction": {"enum": ["sent", "received"]},
+                    "fields": {
+                      "type": "object",
+                      "minProperties": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 1
+              },
               "result_drop_reason_code": {
                 "type": "integer",
                 "minimum": 1,
@@ -338,6 +355,7 @@
                     "anyOf": [
                       {"required": ["frames"]},
                       {"required": ["allowed_frames"]},
+                      {"required": ["frame_payload_invariants"]},
                       {"required": ["result_drop_reason_code"]}
                     ]
                   }

@@ -149,6 +149,12 @@ For frame-level scenarios, `expect.frames` is the ordered required subsequence a
 streaming repetitions remain valid, but an undeclared frame or a required frame observed out of
 order fails validation. Host-route scenarios use route evidence and omit both frame lists.
 
+`expect.frame_payload_invariants` applies exact top-level field expectations to every observed
+instance of a named frame, optionally restricted by `direction`. The runner requires at least one
+matching frame and rejects missing object payloads, absent fields, mismatched values, or a repeated
+frame that violates the invariant. The preview4 cancel scenarios use this mechanism to require
+operation-scoped `TRACE_CONTEXT.frame_id` to equal the corresponding submitted frame id.
+
 ```bash
 cargo run -p nnrp-conformance-runner -- \
   validate-wire-results \

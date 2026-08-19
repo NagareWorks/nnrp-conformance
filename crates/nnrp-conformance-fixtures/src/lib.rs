@@ -608,10 +608,20 @@ pub struct WireConformanceExpectation {
     pub frames: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allowed_frames: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub frame_payload_invariants: Vec<WireConformanceFramePayloadInvariant>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result_drop_reason_code: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub route: Option<WireHostRouteExpectation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WireConformanceFramePayloadInvariant {
+    pub frame: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direction: Option<WireConformanceFrameDirection>,
+    pub fields: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -758,7 +768,7 @@ pub struct WireConformanceObservedFrame {
     pub timestamp_us: Option<u64>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WireConformanceFrameDirection {
     Sent,
