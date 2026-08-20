@@ -466,6 +466,14 @@ fn validate_wire_scenario_shape(scenario: &WireConformanceScenario) -> Result<()
             ),
         });
     }
+    if scenario.host_route.is_some() && !scenario.expect.frame_payload_invariants.is_empty() {
+        return Err(FixtureError::Validation {
+            message: format!(
+                "wire host-route scenario {} must not declare frame_payload_invariants",
+                scenario.id
+            ),
+        });
+    }
     if scenario.expect.result_drop_reason_code == Some(0) {
         return Err(FixtureError::Validation {
             message: format!(
@@ -510,6 +518,7 @@ fn validate_wire_scenario_shape(scenario: &WireConformanceScenario) -> Result<()
                 ),
             });
         }
+        validate_frame_payload_invariant_contract(scenario)?;
     } else if !scenario.expect.frames.is_empty() || !scenario.expect.allowed_frames.is_empty() {
         return Err(FixtureError::Validation {
             message: format!(
@@ -868,6 +877,7 @@ pub fn validate_wire_conformance_results(
                     };
                     observed_cursor += relative_index + 1;
                 }
+                validate_frame_payload_invariants(expected_scenario, result)?;
                 validate_result_drop_reason(expected_scenario, result)?;
                 validate_wire_route_evidence(expected_plan, expected_scenario, result)?;
                 summary.passed_scenarios += 1;
@@ -887,6 +897,92 @@ pub fn validate_wire_conformance_results(
     }
 
     Ok(summary)
+}
+
+fn validate_frame_payload_invariant_contract(
+    scenario: &WireConformanceScenario,
+) -> Result<(), FixtureError> {
+    let mut identities = BTreeSet::new();
+    for invariant in &scenario.expect.frame_payload_invariants {
+        if invariant.frame.is_empty() || invariant.fields.is_empty() {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} frame payload invariants require a frame and at least one field",
+                    scenario.id
+                ),
+            });
+        }
+        if !scenario.expect.allowed_frames.contains(&invariant.frame) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} payload invariant references frame {} outside allowed_frames",
+                    scenario.id, invariant.frame
+                ),
+            });
+        }
+        if !identities.insert((invariant.frame.clone(), invariant.direction)) {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} declares duplicate payload invariants for frame {} and direction {:?}",
+                    scenario.id, invariant.frame, invariant.direction
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_frame_payload_invariants(
+    scenario: &WireConformanceScenario,
+    result: &WireConformanceCaseResult,
+) -> Result<(), FixtureError> {
+    for invariant in &scenario.expect.frame_payload_invariants {
+        let observed = result
+            .observed_frames
+            .iter()
+            .filter(|frame| {
+                frame.frame == invariant.frame
+                    && invariant
+                        .direction
+                        .is_none_or(|direction| frame.direction == direction)
+            })
+            .collect::<Vec<_>>();
+        if observed.is_empty() {
+            return Err(FixtureError::Validation {
+                message: format!(
+                    "wire scenario {} did not observe frame {} for payload validation",
+                    result.id, invariant.frame
+                ),
+            });
+        }
+        for frame in observed {
+            let payload = frame
+                .payload
+                .as_ref()
+                .and_then(serde_json::Value::as_object)
+                .ok_or_else(|| FixtureError::Validation {
+                    message: format!(
+                        "wire scenario {} frame {} has no object payload",
+                        result.id, invariant.frame
+                    ),
+                })?;
+            for (field, expected) in &invariant.fields {
+                if payload.get(field) != Some(expected) {
+                    return Err(FixtureError::Validation {
+                        message: format!(
+                            "wire scenario {} frame {} payload field {} mismatch: expected {}, got {:?}",
+                            result.id,
+                            invariant.frame,
+                            field,
+                            expected,
+                            payload.get(field)
+                        ),
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_result_drop_reason(
@@ -2377,15 +2473,15 @@ mod tests {
         ApiProfileTerminal, BenchmarkArtifactContext, CapabilityManifest, CaseDefinition,
         CaseLayer, CaseManifest, CaseStatus, ProtocolManifest, WireConformanceCaseResult,
         WireConformanceCaseResultReport, WireConformanceExpectation, WireConformanceFrameDirection,
-        WireConformanceLimits, WireConformanceMode, WireConformanceObservedFrame,
-        WireConformanceScenario, WireConformanceStep, WireConformanceTarget,
-        WireConformanceTargetManifest, WireConformanceTerminal, WireConformanceTransport,
-        WireConformanceTransportEndpoint, WireConformanceTransportSecurity,
-        WireHostAcceptedSessionEvidence, WireHostCredentialOwner, WireHostPlatform,
-        WireHostProviderRoute, WireHostRole, WireHostRouteCandidateEvidence, WireHostRouteEvidence,
-        WireHostRouteExpectation, WireHostRouteFixture, WireHostRouteProviderCapability,
-        WireHostRouteRejectionReason, WireHostRouteSecurity, WireHostRouteSecurityMode,
-        load_json_file,
+        WireConformanceFramePayloadInvariant, WireConformanceLimits, WireConformanceMode,
+        WireConformanceObservedFrame, WireConformanceScenario, WireConformanceStep,
+        WireConformanceTarget, WireConformanceTargetManifest, WireConformanceTerminal,
+        WireConformanceTransport, WireConformanceTransportEndpoint,
+        WireConformanceTransportSecurity, WireHostAcceptedSessionEvidence, WireHostCredentialOwner,
+        WireHostPlatform, WireHostProviderRoute, WireHostRole, WireHostRouteCandidateEvidence,
+        WireHostRouteEvidence, WireHostRouteExpectation, WireHostRouteFixture,
+        WireHostRouteProviderCapability, WireHostRouteRejectionReason, WireHostRouteSecurity,
+        WireHostRouteSecurityMode, load_json_file,
     };
     use std::collections::BTreeMap;
     use std::path::{Path, PathBuf};
@@ -3312,6 +3408,7 @@ mod tests {
                 terminal: WireConformanceTerminal::Cancelled,
                 frames: vec!["CANCEL_ACK".to_string()],
                 allowed_frames: vec!["CANCEL_ACK".to_string()],
+                frame_payload_invariants: vec![],
                 result_drop_reason_code: None,
                 route: None,
             },
@@ -3323,6 +3420,19 @@ mod tests {
             direction: WireConformanceFrameDirection::Received,
             frame: frame.to_string(),
             payload: None,
+            timestamp_us: Some(timestamp_us),
+        }
+    }
+
+    fn observed_wire_frame_with_payload(
+        frame: &str,
+        timestamp_us: u64,
+        payload: serde_json::Value,
+    ) -> WireConformanceObservedFrame {
+        WireConformanceObservedFrame {
+            direction: WireConformanceFrameDirection::Received,
+            frame: frame.to_string(),
+            payload: Some(payload),
             timestamp_us: Some(timestamp_us),
         }
     }
@@ -3402,6 +3512,7 @@ mod tests {
                 terminal: WireConformanceTerminal::Success,
                 frames: vec![],
                 allowed_frames: vec![],
+                frame_payload_invariants: vec![],
                 result_drop_reason_code: None,
                 route: Some(WireHostRouteExpectation {
                     selected_count: Some(1),
@@ -3779,6 +3890,78 @@ mod tests {
             error
                 .to_string()
                 .contains("must not declare result_drop_reason_code")
+        );
+    }
+
+    #[test]
+    fn wire_plan_validates_frame_payload_invariant_contract() {
+        let target = sample_wire_target();
+        let artifacts = AdapterArtifactContext {
+            results_path: "artifacts/wire-results.json".to_string(),
+            evidence_dir: "artifacts/wire-evidence".to_string(),
+        };
+        let invariant = WireConformanceFramePayloadInvariant {
+            frame: "TRACE_CONTEXT".to_string(),
+            direction: Some(WireConformanceFrameDirection::Received),
+            fields: BTreeMap::from([("frame_id".to_string(), serde_json::json!(1))]),
+        };
+        let mut scenario = sample_wire_scenario(
+            "wire.control.trace-correlation",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        );
+        scenario
+            .expect
+            .allowed_frames
+            .push("TRACE_CONTEXT".to_string());
+        scenario.expect.frame_payload_invariants = vec![invariant.clone()];
+        build_wire_conformance_execution_plan(&target, &[scenario.clone()], artifacts.clone())
+            .expect("a payload invariant over an allowed frame should validate");
+
+        scenario.expect.frame_payload_invariants[0].fields.clear();
+        let error =
+            build_wire_conformance_execution_plan(&target, &[scenario.clone()], artifacts.clone())
+                .expect_err("an invariant without fields must be rejected");
+        assert!(error.to_string().contains("at least one field"));
+
+        scenario.expect.frame_payload_invariants = vec![invariant.clone(), invariant.clone()];
+        let error =
+            build_wire_conformance_execution_plan(&target, &[scenario.clone()], artifacts.clone())
+                .expect_err("duplicate frame and direction invariants must be rejected");
+        assert!(error.to_string().contains("duplicate payload invariants"));
+
+        scenario.expect.frame_payload_invariants = vec![WireConformanceFramePayloadInvariant {
+            frame: "PARTIAL_RESULT".to_string(),
+            ..invariant
+        }];
+        let error = build_wire_conformance_execution_plan(&target, &[scenario], artifacts)
+            .expect_err("an invariant outside allowed_frames must be rejected");
+        assert!(error.to_string().contains("outside allowed_frames"));
+    }
+
+    #[test]
+    fn wire_plan_rejects_frame_payload_invariants_on_host_route_scenario() {
+        let target = sample_host_route_target();
+        let mut scenario = sample_host_route_scenario();
+        scenario.expect.frame_payload_invariants = vec![WireConformanceFramePayloadInvariant {
+            frame: "TRACE_CONTEXT".to_string(),
+            direction: Some(WireConformanceFrameDirection::Received),
+            fields: BTreeMap::from([("frame_id".to_string(), serde_json::json!(1))]),
+        }];
+        let error = build_wire_conformance_execution_plan(
+            &target,
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect_err("host-route evidence must not declare frame payload invariants");
+        assert!(
+            error
+                .to_string()
+                .contains("must not declare frame_payload_invariants")
         );
     }
 
@@ -4330,6 +4513,71 @@ mod tests {
             },
         )
         .expect("allowed extra and repeated frames should preserve ordered matching");
+    }
+
+    #[test]
+    fn wire_results_enforce_payload_invariants_on_every_matching_frame() {
+        let mut scenario = sample_wire_scenario(
+            "selected",
+            WireConformanceMode::SuiteAsClient,
+            WireConformanceTransport::Tcp,
+            vec!["control.cancel_abort"],
+        );
+        scenario.expect.frames = vec!["TRACE_CONTEXT".to_string()];
+        scenario.expect.allowed_frames = scenario.expect.frames.clone();
+        scenario.expect.frame_payload_invariants = vec![WireConformanceFramePayloadInvariant {
+            frame: "TRACE_CONTEXT".to_string(),
+            direction: Some(WireConformanceFrameDirection::Received),
+            fields: BTreeMap::from([("frame_id".to_string(), serde_json::json!(1))]),
+        }];
+        let plan = build_wire_conformance_execution_plan(
+            &sample_wire_target(),
+            &[scenario],
+            AdapterArtifactContext {
+                results_path: "artifacts/wire-results.json".to_string(),
+                evidence_dir: "artifacts/wire-evidence".to_string(),
+            },
+        )
+        .expect("wire execution plan should build");
+        let report = |payloads: &[Option<u64>]| WireConformanceCaseResultReport {
+            schema: None,
+            protocol_version: "nnrp-1-preview4".to_string(),
+            suite_version: "0.1.0".to_string(),
+            target_name: "sample-target".to_string(),
+            results: vec![WireConformanceCaseResult {
+                id: "selected".to_string(),
+                outcome: ApiProfileCaseOutcome::Passed,
+                terminal: WireConformanceTerminal::Cancelled,
+                observed_frames: payloads
+                    .iter()
+                    .enumerate()
+                    .map(|(index, frame_id)| match frame_id {
+                        Some(frame_id) => observed_wire_frame_with_payload(
+                            "TRACE_CONTEXT",
+                            index as u64,
+                            serde_json::json!({ "frame_id": frame_id }),
+                        ),
+                        None => observed_wire_frame("TRACE_CONTEXT", index as u64),
+                    })
+                    .collect(),
+                route_evidence: None,
+                message: None,
+                evidence_paths: vec![],
+            }],
+        };
+
+        validate_wire_conformance_results(&plan, &report(&[Some(1), Some(1)]))
+            .expect("every matching repeated frame satisfies the invariant");
+        let error = validate_wire_conformance_results(&plan, &report(&[Some(1), Some(2)]))
+            .expect_err("one invalid repeated frame must fail the scenario");
+        assert!(
+            error
+                .to_string()
+                .contains("payload field frame_id mismatch")
+        );
+        let error = validate_wire_conformance_results(&plan, &report(&[None]))
+            .expect_err("a missing payload must fail the scenario");
+        assert!(error.to_string().contains("has no object payload"));
     }
 
     #[test]

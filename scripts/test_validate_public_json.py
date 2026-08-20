@@ -32,6 +32,35 @@ class ProtocolCompositionTests(unittest.TestCase):
                     build_schema_registry(schema_path.parent),
                 )
 
+    def test_wire_schema_rejects_frame_payload_invariant_on_host_route(self) -> None:
+        repository_root = Path(__file__).resolve().parents[1]
+        schema_path = repository_root / "schemas" / "wire-conformance-scenario.schema.json"
+        source_path = (
+            repository_root
+            / "wire-conformance"
+            / "nnrp-1-preview4"
+            / "cases"
+            / "host-route-e2e.json"
+        )
+        manifest = json.loads(source_path.read_text(encoding="utf-8"))
+        manifest["scenarios"][0]["expect"]["frame_payload_invariants"] = [
+            {
+                "frame": "TRACE_CONTEXT",
+                "direction": "received",
+                "fields": {"frame_id": 1},
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as directory:
+            invalid_path = Path(directory) / "host-route-with-frame-payload-invariant.json"
+            self._write_manifest(invalid_path, manifest)
+            with self.assertRaisesRegex(SystemExit, "frame_payload_invariants"):
+                validate_json(
+                    schema_path,
+                    invalid_path,
+                    build_schema_registry(schema_path.parent),
+                )
+
     def test_accepts_unique_cases_and_vectors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

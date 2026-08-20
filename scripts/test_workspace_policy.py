@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUST_SOURCE_COMMIT = "00074cf3c09002de940f011e229de729aa377e88"
+RUST_SOURCE_COMMIT = "dc24aec6667ed23886cae8bd62fda5221a7e3747"
 RUST_VERSION = "1.0.0-preview.4.23"
 
 
