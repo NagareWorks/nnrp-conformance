@@ -21,7 +21,7 @@
           "direction": "received",
           "frame": "TRACE_CONTEXT",
           "payload": {
-            "frame_id": 1,
+            "frame_id": 0,
             "trace_id": "trace-cancel-1",
             "span_id": "span-drop-reason"
           },

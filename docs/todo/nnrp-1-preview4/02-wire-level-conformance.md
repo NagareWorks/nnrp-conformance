@@ -22,7 +22,8 @@ NNRP frames directly.
   - [x] Reject every observed frame outside the scenario's exhaustive `allowed_frames` set.
   - [x] Reject missing or reordered required frames with scenario-local diagnostics.
   - [x] Enforce declared frame payload invariants across every repeated matching frame.
-  - [x] Verify operation-scoped `TRACE_CONTEXT.frame_id` equals the submitted frame identity.
+  - [x] Verify operation-scoped `TRACE_CONTEXT.frame_id` equals the active submitted frame identity
+        and terminal-operation traces use session scope (`frame_id=0`).
 - [x] Add CI examples that launch the reference target as a separate process and exercise all selected roles over live endpoints.
 - [x] Validate that cache-reference scenarios preserve `cache_namespace`, `cache_key_hi`, and
       `cache_key_lo` without collapsing the 128-bit key into a text alias.

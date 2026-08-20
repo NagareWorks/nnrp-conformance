@@ -55,7 +55,7 @@
             "frame": "TRACE_CONTEXT",
             "direction": "received",
             "fields": {
-              "frame_id": 1
+              "frame_id": 0
             }
           }
         ]
@@ -334,7 +334,7 @@
             "frame": "TRACE_CONTEXT",
             "direction": "received",
             "fields": {
-              "frame_id": 1
+              "frame_id": 0
             }
           }
         ]
