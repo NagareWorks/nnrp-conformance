@@ -319,6 +319,8 @@ fn write_manifest_atomically(
 }
 
 async fn cancel_target(server: &NnrpServer) -> Result<()> {
+    const SESSION_SCOPED_FRAME_ID: u32 = 0;
+
     let mut session = server.accept().await?;
     let submit = session.receive_submit().await?;
     match session.await_event().await? {
@@ -329,7 +331,7 @@ async fn cancel_target(server: &NnrpServer) -> Result<()> {
     }
     session
         .send_trace_context(
-            submit.frame_id,
+            SESSION_SCOPED_FRAME_ID,
             cancel_trace(),
             canonical_trace_body().to_vec(),
         )

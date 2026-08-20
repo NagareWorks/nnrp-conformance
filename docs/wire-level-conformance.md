@@ -153,7 +153,9 @@ order fails validation. Host-route scenarios use route evidence and omit both fr
 instance of a named frame, optionally restricted by `direction`. The runner requires at least one
 matching frame and rejects missing object payloads, absent fields, mismatched values, or a repeated
 frame that violates the invariant. The preview4 cancel scenarios use this mechanism to require
-operation-scoped `TRACE_CONTEXT.frame_id` to equal the corresponding submitted frame id.
+session-scoped `TRACE_CONTEXT.frame_id=0` after the operation has entered a terminal state. Other
+scenarios use the same mechanism to require an operation-scoped trace to equal the corresponding
+active submit frame id.
 
 ```bash
 cargo run -p nnrp-conformance-runner -- \
