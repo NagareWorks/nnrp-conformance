@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUST_SOURCE_COMMIT = "dc24aec6667ed23886cae8bd62fda5221a7e3747"
-RUST_VERSION = "1.0.0-preview.4.23"
+RUST_SOURCE_COMMIT = "35b4ed1e0764623d278035ca1449daeab4192c5c"
+RUST_VERSION = "1.0.0-preview.4.25"
 
 
 class WorkspacePolicyTests(unittest.TestCase):
