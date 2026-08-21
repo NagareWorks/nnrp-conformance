@@ -1459,7 +1459,7 @@ mod tests {
                 .expect("wire conformance suite manifest should load");
 
         assert_eq!(manifest.protocol_version, "nnrp-1-preview4");
-        assert_eq!(manifest.scenario_manifests.len(), 2);
+        assert_eq!(manifest.scenario_manifests.len(), 3);
 
         let mut all_scenarios = Vec::new();
 
@@ -1473,12 +1473,16 @@ mod tests {
             all_scenarios.extend(scenarios.scenarios);
         }
 
-        assert_eq!(all_scenarios.len(), 19);
+        assert_eq!(all_scenarios.len(), 20);
         assert!(
             all_scenarios
                 .iter()
                 .any(|scenario| scenario.feature == "control.cancel_abort")
         );
+        assert!(all_scenarios.iter().any(|scenario| {
+            scenario.id == "wire.profile.openai-compatible.level1"
+                && scenario.feature == "profile.openai-compatible.level1.wire"
+        }));
 
         let deadline_scenario = all_scenarios
             .iter()

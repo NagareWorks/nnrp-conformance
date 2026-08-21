@@ -45,6 +45,11 @@ NNRP frames directly.
   - [x] Record every opened, rolled-back, accepted, and closed server listener.
   - [x] Record every actual bound provider endpoint and terminal listener-set failure.
 - [x] Add CI reference targets proving the host-route scenarios fail for singular-role implementations.
+- [x] Add direct OpenAI-compatible profile wire mapping coverage.
+  - [x] Submit the frozen single-frame `STRUCTURED_EVENT` request without an SDK adapter.
+  - [x] Verify each `PARTIAL_RESULT` carries one raw UTF-8 JSON event without typed or SSE framing.
+  - [x] Verify non-empty `RESULT_PUSH` bodies repeat the frozen typed descriptor mapping.
+  - [x] Reject metadata/body mismatches, invalid typed framing, and invalid JSON in runner tests.
 
 ## Exit criteria
 

@@ -15,6 +15,7 @@
     "ipc"
   ],
   "scenario_manifests": [
+    "cases/openai-compatible-e2e.json",
     "cases/runtime-control-e2e.json",
     "cases/host-route-e2e.json"
   ],

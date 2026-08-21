@@ -108,6 +108,7 @@ async fn run_reference_target(manifest_path: &Path, profile: TargetProfile) -> R
         &websocket_endpoint,
     )?;
 
+    nnrp_conformance_runner::openai_profile_wire::serve_target(&tcp_server).await?;
     cancel_target(&tcp_server).await?;
     deadline_before_submit_target(&tcp_server).await?;
     drop(tcp_server);
@@ -202,6 +203,7 @@ fn write_target_manifest(
                 "control.budget_update".to_string(),
                 "object.lifecycle".to_string(),
                 "host.routes".to_string(),
+                nnrp_conformance_runner::openai_profile_wire::CAPABILITY.to_string(),
             ],
             limits: WireConformanceLimits {
                 max_frame_bytes: 16_777_216,

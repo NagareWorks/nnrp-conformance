@@ -21,6 +21,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::time::Duration;
 
+pub mod openai_profile_wire;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum CaseSelection {
     Selected,
@@ -1473,11 +1475,18 @@ async fn run_wire_external_scenario(
                 transport
             ),
         })?;
-    let case = wire_external_case_for_scenario(scenario)?;
     let endpoint = wire_reference_endpoint(endpoint_manifest, target_manifest_path)?;
     let timeout = wire_scenario_timeout(scenario);
 
-    let execution = tokio::time::timeout(timeout, run_wire_external_case(case, &endpoint)).await;
+    let execution = if scenario.id == openai_profile_wire::SCENARIO_ID {
+        tokio::time::timeout(timeout, openai_profile_wire::run_client(&endpoint)).await
+    } else {
+        let case = wire_external_case_for_scenario(scenario)?;
+        tokio::time::timeout(timeout, async {
+            Ok(run_wire_external_case(case, &endpoint).await?)
+        })
+        .await
+    };
     let evidence_paths = vec![wire_evidence_path(plan, &scenario.id)];
     match execution {
         Ok(Ok(report)) => Ok(wire_external_case_result(scenario, report, evidence_paths)),
