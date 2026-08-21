@@ -8,13 +8,13 @@ use nnrp_conformance::wire_external::{
 };
 use nnrp_core::{
     BODY_REGION_PRELUDE_LEN, BodyRegionPrelude, MessageType, OperationState, PartialResultMetadata,
-    PayloadKind, PayloadKindBitmap, ResultClass, ResultPushMetadata, TypedPayloadDescriptor,
-    TypedPayloadRegion,
+    PayloadKind, PayloadKindBitmap, ProgressMetadata, ResultClass, ResultPushMetadata,
+    TypedPayloadDescriptor, TypedPayloadRegion,
 };
 use nnrp_runtime::{
     NnrpClientRoleEvent, NnrpRuntimeEvent, NnrpRuntimeEventMetadata, NnrpRuntimeEventTail,
     NnrpServer, NnrpServerEvent, NnrpSubmitHeaderContext, NnrpSubmitIdentity, NnrpSubmitPolicy,
-    NnrpSubmitRequest, NnrpTerminalEvent, NnrpTypedPayloadInputFrame, NnrpTypedPayloadSubmitInput,
+    NnrpSubmitRequest, NnrpTypedPayloadInputFrame, NnrpTypedPayloadSubmitInput,
 };
 use serde_json::{Value, json};
 
@@ -27,6 +27,7 @@ const OPENAI_SCHEMA_VERSION: &str = "openai-compatible/1";
 const STREAM_SEMANTICS_SNAPSHOT: u16 = 1;
 const REQUEST_BODY: &[u8] = br#"{"schema_version":"openai-compatible/1","operation":"chat.completions.create","request_id":"req_wire_1","body":{"model":"reference-model","messages":[{"role":"user","content":"ping"}],"stream":true}}"#;
 const PARTIAL_BODY: &[u8] = br#"{"type":"response.output_text.delta","index":0,"delta":"pong"}"#;
+const USAGE_BODY: &[u8] = br#"{"type":"response.usage","usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"#;
 const TERMINAL_BODY: &[u8] = br#"{"type":"response.completed","body":{"id":"chatcmpl_wire_1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}}"#;
 
 pub async fn run_client(endpoint: &WireReferenceEndpoint) -> Result<WireExternalCaseReport> {
@@ -47,53 +48,64 @@ pub async fn run_client(endpoint: &WireReferenceEndpoint) -> Result<WireExternal
         typed_detail("request", Some(OPENAI_SCHEMA_VERSION)),
     ));
 
-    let partial = expect_runtime_event(session.await_event().await?)?;
-    let partial_body = match (&partial.metadata, &partial.tail) {
-        (NnrpRuntimeEventMetadata::PartialResult(metadata), NnrpRuntimeEventTail::Body(body))
-            if partial.header.message_type == MessageType::PartialResult
+    let mut saw_text_delta = false;
+    let (metadata, body) = loop {
+        let event = expect_runtime_event(session.await_event().await?)?;
+        match (&event.metadata, &event.tail) {
+            (NnrpRuntimeEventMetadata::Progress(metadata), tail)
+                if event.header.message_type == MessageType::Progress
+                    && metadata.operation_id == OPERATION_ID
+                    && runtime_tail_len(tail) == Some(metadata.body_bytes as usize) =>
+            {
+                continue;
+            }
+            (
+                NnrpRuntimeEventMetadata::PartialResult(metadata),
+                NnrpRuntimeEventTail::Body(body),
+            ) if event.header.message_type == MessageType::PartialResult
                 && metadata.operation_id == OPERATION_ID
                 && metadata.body_bytes as usize == body.len() =>
-        {
-            body
+            {
+                let partial_event = parse_json(body, "PARTIAL_RESULT")?;
+                let event_type = partial_event
+                    .get("type")
+                    .and_then(Value::as_str)
+                    .context("PARTIAL_RESULT does not carry an event type")?;
+                if event_type == "response.output_text.delta" && !saw_text_delta {
+                    saw_text_delta = true;
+                    observed_frames.push(observed(
+                        started,
+                        WireExternalDirection::TargetToSuite,
+                        WireExternalFrame::PartialResult,
+                        json!({
+                            "body_encoding": "utf-8-json-event",
+                            "body_framing": "raw",
+                            "events_per_frame": 1,
+                            "typed_payload_envelope": false,
+                            "sse_delimiters_allowed": false,
+                            "event_type": "response.output_text.delta",
+                        }),
+                    ));
+                }
+            }
+            (NnrpRuntimeEventMetadata::ResultPush(metadata), NnrpRuntimeEventTail::Body(body))
+                if event.header.message_type == MessageType::ResultPush
+                    && event.header.frame_id == FRAME_ID =>
+            {
+                if !saw_text_delta {
+                    bail!("OpenAI profile target completed before returning a text delta");
+                }
+                break (*metadata, body.clone());
+            }
+            _ => bail!(
+                "OpenAI profile target returned an unexpected event before terminal completion"
+            ),
         }
-        _ => bail!("OpenAI profile target returned an invalid PARTIAL_RESULT"),
-    };
-    let partial_event = parse_json(partial_body, "PARTIAL_RESULT")?;
-    require_event_type(
-        &partial_event,
-        "response.output_text.delta",
-        "PARTIAL_RESULT",
-    )?;
-    observed_frames.push(observed(
-        started,
-        WireExternalDirection::TargetToSuite,
-        WireExternalFrame::PartialResult,
-        json!({
-            "body_encoding": "utf-8-json-event",
-            "body_framing": "raw",
-            "events_per_frame": 1,
-            "typed_payload_envelope": false,
-            "sse_delimiters_allowed": false,
-            "event_type": "response.output_text.delta",
-        }),
-    ));
-
-    let result = session.await_result().await?;
-    if result.operation_id != OPERATION_ID {
-        bail!("OpenAI profile target returned a result for another operation");
-    }
-    let (metadata, body) = match &result.event {
-        NnrpTerminalEvent::Runtime(NnrpRuntimeEvent {
-            header,
-            metadata: NnrpRuntimeEventMetadata::ResultPush(metadata),
-            tail: NnrpRuntimeEventTail::Body(body),
-        }) if header.message_type == MessageType::ResultPush => (metadata, body),
-        _ => bail!("OpenAI profile target did not return a runtime RESULT_PUSH"),
     };
     let terminal_event = decode_profile_body(
         metadata.payload_kind_bitmap,
         metadata.payload_frame_count,
-        body,
+        &body,
     )?;
     require_event_type(&terminal_event, "response.completed", "RESULT_PUSH")?;
     observed_frames.push(observed(
@@ -133,6 +145,21 @@ pub async fn serve_target(server: &NnrpServer) -> Result<()> {
     }
 
     submit
+        .send_progress(
+            &mut session,
+            ProgressMetadata {
+                operation_id: OPERATION_ID,
+                progress_sequence: 1,
+                stage_code: 1,
+                percent_x100: 5_000,
+                object_id: 0,
+                body_bytes: 0,
+            },
+            Vec::new(),
+        )
+        .await?;
+
+    submit
         .send_partial_result(
             &mut session,
             PartialResultMetadata {
@@ -144,6 +171,21 @@ pub async fn serve_target(server: &NnrpServer) -> Result<()> {
                 flags: 0,
             },
             PARTIAL_BODY.to_vec(),
+        )
+        .await?;
+
+    submit
+        .send_partial_result(
+            &mut session,
+            PartialResultMetadata {
+                operation_id: OPERATION_ID,
+                result_sequence: 2,
+                object_id: 0,
+                delta_sequence: 1,
+                body_bytes: u32::try_from(USAGE_BODY.len())?,
+                flags: 0,
+            },
+            USAGE_BODY.to_vec(),
         )
         .await?;
 
@@ -304,6 +346,16 @@ fn expect_runtime_event(event: NnrpClientRoleEvent) -> Result<NnrpRuntimeEvent> 
         NnrpClientRoleEvent::Lifecycle(event) => {
             bail!("expected an OpenAI profile runtime event, got lifecycle {event:?}")
         }
+    }
+}
+
+fn runtime_tail_len(tail: &NnrpRuntimeEventTail) -> Option<usize> {
+    match tail {
+        NnrpRuntimeEventTail::None => Some(0),
+        NnrpRuntimeEventTail::Body(body) | NnrpRuntimeEventTail::Diagnostic(body) => {
+            Some(body.len())
+        }
+        NnrpRuntimeEventTail::MetadataBodyAndDelta { .. } => None,
     }
 }
 
