@@ -4,7 +4,8 @@
   "schema_version": "openai-compatible/1",
   "level": 1,
   "protocol_baselines": [
-    "nnrp-1-preview3"
+    "nnrp-1-preview3",
+    "nnrp-1-preview4"
   ],
   "recipe_manifests": [
     "recipes/chat-streaming-text.json",

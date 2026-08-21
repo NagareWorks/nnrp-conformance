@@ -1224,6 +1224,10 @@ mod tests {
 
         assert_eq!(manifest.profile, "openai-compatible");
         assert_eq!(manifest.schema_version, "openai-compatible/1");
+        assert_eq!(
+            manifest.protocol_baselines,
+            ["nnrp-1-preview3", "nnrp-1-preview4"]
+        );
         assert_eq!(manifest.recipe_manifests.len(), 8);
 
         for recipe_path in &manifest.recipe_manifests {
