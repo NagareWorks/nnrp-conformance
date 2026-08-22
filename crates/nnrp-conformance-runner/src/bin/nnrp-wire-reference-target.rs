@@ -100,6 +100,13 @@ async fn run_reference_target(manifest_path: &Path, profile: TargetProfile) -> R
 
     let websocket_addr = reserve_loopback_addr()?;
     let websocket_endpoint = format!("wss://localhost:{}/nnrp", websocket_addr.port());
+    let websocket_server = WireReferenceEndpoint::secure(
+        ReferenceTransport::WebSocket,
+        websocket_endpoint.clone(),
+        security.clone(),
+    )
+    .bind()
+    .await?;
     write_target_manifest(
         manifest_path,
         tcp_addr,
@@ -109,6 +116,9 @@ async fn run_reference_target(manifest_path: &Path, profile: TargetProfile) -> R
     )?;
 
     nnrp_conformance_runner::openai_profile_wire::serve_target(&tcp_server).await?;
+    nnrp_conformance_runner::openai_profile_wire::serve_target(&ipc_server).await?;
+    nnrp_conformance_runner::openai_profile_wire::serve_target(&websocket_server).await?;
+    drop(websocket_server);
     cancel_target(&tcp_server).await?;
     deadline_before_submit_target(&tcp_server).await?;
     drop(tcp_server);

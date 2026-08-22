@@ -1477,15 +1477,28 @@ mod tests {
             all_scenarios.extend(scenarios.scenarios);
         }
 
-        assert_eq!(all_scenarios.len(), 20);
+        assert_eq!(all_scenarios.len(), 22);
         assert!(
             all_scenarios
                 .iter()
                 .any(|scenario| scenario.feature == "control.cancel_abort")
         );
-        assert!(all_scenarios.iter().any(|scenario| {
+        let openai_profile_scenarios = all_scenarios
+            .iter()
+            .filter(|scenario| scenario.feature == "profile.openai-compatible.level1.wire")
+            .collect::<Vec<_>>();
+        assert_eq!(openai_profile_scenarios.len(), 3);
+        assert!(openai_profile_scenarios.iter().any(|scenario| {
             scenario.id == "wire.profile.openai-compatible.level1"
-                && scenario.feature == "profile.openai-compatible.level1.wire"
+                && scenario.transport == Some(WireConformanceTransport::Tcp)
+        }));
+        assert!(openai_profile_scenarios.iter().any(|scenario| {
+            scenario.id == "wire.profile.openai-compatible.level1.ipc"
+                && scenario.transport == Some(WireConformanceTransport::Ipc)
+        }));
+        assert!(openai_profile_scenarios.iter().any(|scenario| {
+            scenario.id == "wire.profile.openai-compatible.level1.websocket"
+                && scenario.transport == Some(WireConformanceTransport::Websocket)
         }));
 
         let deadline_scenario = all_scenarios

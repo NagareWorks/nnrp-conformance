@@ -19,6 +19,8 @@ use nnrp_runtime::{
 use serde_json::{Value, json};
 
 pub const SCENARIO_ID: &str = "wire.profile.openai-compatible.level1";
+pub const IPC_SCENARIO_ID: &str = "wire.profile.openai-compatible.level1.ipc";
+pub const WEBSOCKET_SCENARIO_ID: &str = "wire.profile.openai-compatible.level1.websocket";
 pub const CAPABILITY: &str = "profile.openai-compatible.level1.wire";
 
 const OPERATION_ID: u64 = 901;
@@ -30,12 +32,12 @@ const PARTIAL_BODY: &[u8] = br#"{"type":"response.output_text.delta","index":0,"
 const USAGE_BODY: &[u8] = br#"{"type":"response.usage","usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"#;
 const TERMINAL_BODY: &[u8] = br#"{"type":"response.completed","body":{"id":"chatcmpl_wire_1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}}"#;
 
-pub async fn run_client(endpoint: &WireReferenceEndpoint) -> Result<WireExternalCaseReport> {
+pub async fn run_client(
+    endpoint: &WireReferenceEndpoint,
+    scenario_id: &str,
+) -> Result<WireExternalCaseReport> {
     endpoint.validate()?;
-    if endpoint.transport != ReferenceTransport::Tcp {
-        bail!("OpenAI profile wire scenario requires the TCP reference endpoint");
-    }
-
+    let report_scenario_id = resolve_scenario_id(scenario_id, endpoint.transport)?;
     let started = Instant::now();
     let mut observed_frames = Vec::new();
     let mut session = endpoint.connect().await?.open_session().await?;
@@ -117,9 +119,9 @@ pub async fn run_client(endpoint: &WireReferenceEndpoint) -> Result<WireExternal
     session.close().await?;
 
     Ok(WireExternalCaseReport {
-        scenario_id: SCENARIO_ID,
+        scenario_id: report_scenario_id,
         mode: WireExternalMode::SuiteAsClient,
-        transport: ReferenceTransport::Tcp,
+        transport: endpoint.transport,
         terminal: WireExternalTerminal::Success,
         elapsed_us: started.elapsed().as_micros(),
         observed_frames,
@@ -127,6 +129,24 @@ pub async fn run_client(endpoint: &WireReferenceEndpoint) -> Result<WireExternal
         trace_context: None,
         cache_miss: None,
     })
+}
+
+fn resolve_scenario_id(scenario_id: &str, transport: ReferenceTransport) -> Result<&'static str> {
+    let report_scenario_id = match scenario_id {
+        SCENARIO_ID if transport == ReferenceTransport::Tcp => SCENARIO_ID,
+        IPC_SCENARIO_ID if transport == ReferenceTransport::Ipc => IPC_SCENARIO_ID,
+        WEBSOCKET_SCENARIO_ID if transport == ReferenceTransport::WebSocket => {
+            WEBSOCKET_SCENARIO_ID
+        }
+        SCENARIO_ID | IPC_SCENARIO_ID | WEBSOCKET_SCENARIO_ID => {
+            bail!(
+                "OpenAI profile wire scenario {scenario_id} does not match the {:?} reference endpoint",
+                transport
+            )
+        }
+        _ => bail!("unknown OpenAI profile wire scenario {scenario_id}"),
+    };
+    Ok(report_scenario_id)
 }
 
 pub async fn serve_target(server: &NnrpServer) -> Result<()> {
@@ -395,9 +415,11 @@ fn observed(
 #[cfg(test)]
 mod tests {
     use super::{
-        OPENAI_SCHEMA_VERSION, REQUEST_BODY, TERMINAL_BODY, decode_profile_body, typed_request,
+        IPC_SCENARIO_ID, OPENAI_SCHEMA_VERSION, REQUEST_BODY, SCENARIO_ID, TERMINAL_BODY,
+        WEBSOCKET_SCENARIO_ID, decode_profile_body, resolve_scenario_id, typed_request,
         typed_terminal_result,
     };
+    use nnrp_conformance::wire_endpoint::ReferenceTransport;
     use nnrp_core::{PayloadKindBitmap, TYPED_PAYLOAD_DESCRIPTOR_LEN};
 
     #[test]
@@ -467,5 +489,27 @@ mod tests {
         )
         .expect_err("invalid JSON must be rejected");
         assert!(error.to_string().contains("valid JSON"));
+    }
+
+    #[test]
+    fn scenario_ids_are_bound_to_their_declared_transports() {
+        for (scenario_id, transport) in [
+            (SCENARIO_ID, ReferenceTransport::Tcp),
+            (IPC_SCENARIO_ID, ReferenceTransport::Ipc),
+            (WEBSOCKET_SCENARIO_ID, ReferenceTransport::WebSocket),
+        ] {
+            assert_eq!(
+                resolve_scenario_id(scenario_id, transport).unwrap(),
+                scenario_id
+            );
+        }
+
+        let error = resolve_scenario_id(SCENARIO_ID, ReferenceTransport::Ipc)
+            .expect_err("scenario and transport mismatch must fail");
+        assert!(error.to_string().contains("does not match"));
+
+        let error = resolve_scenario_id("wire.profile.unknown", ReferenceTransport::Tcp)
+            .expect_err("unknown OpenAI profile scenario must fail");
+        assert!(error.to_string().contains("unknown"));
     }
 }

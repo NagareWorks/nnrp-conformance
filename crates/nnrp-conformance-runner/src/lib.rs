@@ -1478,8 +1478,12 @@ async fn run_wire_external_scenario(
     let endpoint = wire_reference_endpoint(endpoint_manifest, target_manifest_path)?;
     let timeout = wire_scenario_timeout(scenario);
 
-    let execution = if scenario.id == openai_profile_wire::SCENARIO_ID {
-        tokio::time::timeout(timeout, openai_profile_wire::run_client(&endpoint)).await
+    let execution = if scenario.feature == openai_profile_wire::CAPABILITY {
+        tokio::time::timeout(
+            timeout,
+            openai_profile_wire::run_client(&endpoint, &scenario.id),
+        )
+        .await
     } else {
         let case = wire_external_case_for_scenario(scenario)?;
         tokio::time::timeout(timeout, async {
